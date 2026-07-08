@@ -146,6 +146,15 @@ TASK:
 
 JSON OUTPUT:
 """
+        messages = [
+            {"role": "system", "content": "You are a strict JSON generator."},
+            {"role": "user", "content": full_prompt}
+        ]
+        
+        try:
+            prompt_text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        except Exception:
+            prompt_text = full_prompt
 
         temperature = 0.3
         top_p = 0.9
@@ -180,10 +189,10 @@ JSON OUTPUT:
                 return json.load(f)
 
         inputs = self.tokenizer(
-            full_prompt,
+            prompt_text,
             return_tensors="pt",
             truncation=True,
-            max_length=2048
+            max_length=4096
         ).to(self.model.device)
 
         n_prompt_tokens = inputs.input_ids.shape[1]
@@ -191,7 +200,7 @@ JSON OUTPUT:
 
         output = self.model.generate(
             **inputs,
-            max_new_tokens=2048,
+            max_new_tokens=4096,
             temperature=temperature,
             top_p=0.9,
             do_sample=True,

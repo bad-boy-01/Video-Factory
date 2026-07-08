@@ -242,20 +242,26 @@ class DiffusersProvider(ImageGenerationProvider):
         detected, embedding format mismatch - falls back to the standard
         IP-Adapter composite path rather than dropping conditioning entirely.
         """
-        if not ip_adapter_refs:
+        if not self._ip_adapter_loaded:
             return {}
 
-        if self._faceid_loaded and len(ip_adapter_refs) == 1:
+        if self._faceid_loaded and ip_adapter_refs and len(ip_adapter_refs) == 1:
             path = next(iter(ip_adapter_refs.values()))
             embeds = self._extract_face_embedding(path)
             if embeds is not None:
+                self.pipeline.set_ip_adapter_scale(0.6)
                 return {"ip_adapter_image_embeds": [embeds]}
             # No face found / extraction failed - fall through below.
 
         ip_image = self._build_ip_adapter_image(ip_adapter_refs)
-        if ip_image is not None and self._ip_adapter_loaded:
+        if ip_image is not None:
+            self.pipeline.set_ip_adapter_scale(0.6)
             return {"ip_adapter_image": ip_image}
-        return {}
+            
+        import numpy as np
+        dummy = Image.fromarray(np.zeros((256, 256, 3), dtype=np.uint8))
+        self.pipeline.set_ip_adapter_scale(0.0)
+        return {"ip_adapter_image": dummy}
 
     def _try_load_face_id(self):
         """
@@ -393,7 +399,7 @@ class DiffusersProvider(ImageGenerationProvider):
             if callback:
                 callback(step, preset.steps)
                 
-        image = self.pipeline(
+        kwargs = dict(
             prompt=prompt,
             negative_prompt=negative,
             num_inference_steps=preset.steps,
@@ -403,7 +409,15 @@ class DiffusersProvider(ImageGenerationProvider):
             generator=generator,
             callback=cb_wrapper if callback else None,
             callback_steps=1
-        ).images[0]
+        )
+        if self._ip_adapter_loaded:
+            import numpy as np
+            from PIL import Image
+            dummy = Image.fromarray(np.zeros((256, 256, 3), dtype=np.uint8))
+            self.pipeline.set_ip_adapter_scale(0.0)
+            kwargs["ip_adapter_image"] = dummy
+
+        image = self.pipeline(**kwargs).images[0]
         
         return image
         
