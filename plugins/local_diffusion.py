@@ -350,12 +350,6 @@ class DiffusersProvider(ImageGenerationProvider):
                 cache_dir=self.config.cache_dir
             )
             
-        if self.device == "cuda":
-            if self.config.cpu_offload:
-                self.pipeline.enable_model_cpu_offload()
-            else:
-                self.pipeline.to("cuda")
-
         try:
             self.pipeline.load_ip_adapter(
                 "h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter_sdxl.bin"
@@ -369,6 +363,12 @@ class DiffusersProvider(ImageGenerationProvider):
                 f"[Resource] IP-Adapter failed to load ({e}) - continuing with "
                 "text-only generation (no character reference conditioning)."
             )
+
+        if self.device == "cuda":
+            if self.config.cpu_offload:
+                self.pipeline.enable_model_cpu_offload()
+            else:
+                self.pipeline.to("cuda")
 
         if getattr(self.config, "use_face_id", False):
             self._try_load_face_id()
