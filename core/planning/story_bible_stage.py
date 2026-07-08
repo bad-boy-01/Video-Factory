@@ -121,6 +121,9 @@ Only extract characters/locations that appear or are meaningfully referenced in
 THIS chunk - do not invent ones from the earlier context below, which is only
 provided to help you keep descriptions consistent with what was already
 established.
+
+CRITICAL: You MUST include BOTH the "characters" and "locations" top-level keys in your JSON response. If there are no characters or locations in this chunk, return an empty array [] for that key.
+
 {context_block}
 Chunk (chapter {chunk.chapter}):
 {chunk.text}
