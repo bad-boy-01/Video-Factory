@@ -1,4 +1,4 @@
-﻿"""
+"""
 CharacterSheetsStage
 ====================
 Generates 7-pose reference images for every character in story_bible.json.
@@ -6,7 +6,7 @@ Generates 7-pose reference images for every character in story_bible.json.
 Poses: front | side | three_quarter | smiling | angry | sad | action
 
 Storage:  workspace/characters/<character_name>/<pose>.png
-  The three_quarter.png is wired as the IP-Adapter reference in render().
+  The reference_sheet.png is wired as the IP-Adapter reference in render().
 
 Idempotency: Skips a character if all 7 pose files already exist.
   Pass force=True to regenerate regardless.
@@ -22,13 +22,7 @@ from typing import Any, Dict, Tuple
 logger = logging.getLogger(__name__)
 
 POSE_CONFIGS = [
-    {"pose": "front",         "description": "full-body front view, neutral expression, arms at sides", "framing": "full body shot",  "mood": "neutral"},
-    {"pose": "side",          "description": "full-body side profile, neutral expression",              "framing": "full body shot",  "mood": "neutral"},
-    {"pose": "three_quarter", "description": "three-quarter view, slight turn, natural expression",    "framing": "medium shot",     "mood": "calm"},
-    {"pose": "smiling",       "description": "portrait, warm smile, looking at camera",                "framing": "close-up shot",   "mood": "happy"},
-    {"pose": "angry",         "description": "portrait, furrowed brow, intense expression",            "framing": "close-up shot",   "mood": "angry"},
-    {"pose": "sad",           "description": "portrait, downcast eyes, melancholy expression",         "framing": "close-up shot",   "mood": "sad"},
-    {"pose": "action",        "description": "dynamic action pose, full body, motion implied",         "framing": "wide shot",       "mood": "intense"},
+    {"pose": "reference_sheet", "description": "character design sheet, character turnaround, multiple views, front view, side view, back view", "framing": "full body", "mood": "neutral"},
 ]
 
 ALL_POSES = {cfg["pose"] for cfg in POSE_CONFIGS}

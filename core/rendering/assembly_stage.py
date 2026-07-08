@@ -34,8 +34,9 @@ class FFmpegAssemblyStage(PipelineStage):
         clip_count = len(video_track.clips) if video_track else 0
         logger.info(f"Assembling video from Timeline ({clip_count} items)...")
         
-        # 1. Create concat file for FFmpeg
-        concat_file = workspace.get_output_path("concat.txt")
+        # 1. Create a directory for the manhwa panels
+        slideshow_dir = workspace.get_output_path("manhwa_slideshow")
+        slideshow_dir.mkdir(parents=True, exist_ok=True)
         
         images = []
         if video_track:
@@ -45,56 +46,30 @@ class FFmpegAssemblyStage(PipelineStage):
                     images.append(asset.path)
         
         if not images:
-            raise ValueError("FFmpegAssembly: No rendered assets found.")
+            raise ValueError("ManhwaAssembly: No rendered assets found.")
             
-        with open(concat_file, "w", encoding="utf-8") as f:
-            for img in images:
-                # Use absolute paths and forward slashes for FFmpeg path compatibility
-                img_path = os.path.abspath(img).replace("\\", "/")
-                f.write(f"file '{img_path}'\n")
-                f.write(f"duration 4.0\n") # Static duration for demo
-                
-        output_video = workspace.get_output_path("final_video.mp4")
-        srt_file = workspace.get_output_path("subtitles.srt")
-        
-        # 2. FFmpeg command: Subtitle multiplexing
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", str(concat_file)
-        ]
-        
-        if os.path.exists(srt_file):
-            # Escape path for FFmpeg filter
-            srt_escaped = srt_file.replace("\\", "/").replace(":", "\\:")
-            cmd.extend(["-vf", f"subtitles={srt_escaped}"])
+        import shutil
+        panel_paths = []
+        for i, img_path in enumerate(images):
+            # Output nicely numbered panels
+            dest_name = f"panel_{i:03d}.png"
+            dest_path = slideshow_dir / dest_name
+            shutil.copy(img_path, dest_path)
+            panel_paths.append(str(dest_path))
             
-        cmd.extend([
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            output_video
-        ])
-        
-        logger.info(f"Running FFmpeg: {' '.join(cmd)}")
-        try:
-            subprocess.run(cmd, check=True, capture_output=True)
-            logger.info(f"Successfully rendered video: {output_video}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"FFmpeg failed: {e.stderr.decode()}")
-            raise e
+        logger.info(f"Successfully assembled {len(images)} manhwa panels in {slideshow_dir}")
             
-        # 3. Cleanup: Images are archived in AssetRegistry, do not delete them.
+        # 2. Cleanup: Images are archived in AssetRegistry, do not delete them.
         logger.info("Preserving intermediate assets in cache (Archive-based management).")
             
         RenderQueue().vacuum()
         logger.info("RenderQueue vacuumed.")
         
-        node = ExecutionNode(artifact=timeline, stage_name="FFmpegAssemblyStage")
+        node = ExecutionNode(artifact=timeline, stage_name="ManhwaAssemblyStage")
         
         return StageResult(
             artifact=timeline,
             execution_node=node,
-            metrics={"video_path": output_video},
+            metrics={"slideshow_dir": str(slideshow_dir), "panel_count": len(panel_paths)},
             metadata={}
         )

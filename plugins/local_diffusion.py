@@ -87,8 +87,8 @@ class DiffusersCompiler(ProviderCompiler):
         if logical.emphasis:
             sections.append(f"({logical.emphasis}:0.9)")
             
-        prompt_str = " ".join(sections)
-        negative_str = "low quality, blurry, distorted, bad anatomy, watermark"
+        prompt_str = "(Korean manhwa style:1.3), (webtoon art style:1.2), cel-shaded, vibrant colors, " + " ".join(sections)
+        negative_str = "3d, realistic, photography, low quality, blurry, distorted, bad anatomy, watermark"
         
         from core.domain.prompt.provider_request import GenerationParams, ConditioningParams, BindingParams
         return ProviderRequest(
