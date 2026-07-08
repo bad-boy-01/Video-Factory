@@ -374,7 +374,7 @@ class NovelFactoryAPI:
             provider = MockProvider()
             compiler = MockCompiler()
         else:
-            from plugins.local_diffusion import DiffusersProvider, DiffusersCompiler
+            from plugins.local_diffusion import AnimateDiffProvider, DiffusersCompiler
             from plugins.interfaces import DiffusionConfig
             
             diffusion_config = DiffusionConfig(
@@ -383,7 +383,7 @@ class NovelFactoryAPI:
                 dtype=self.config.dtype,
                 cpu_offload=self.config.cpu_offload,
             )
-            provider = DiffusersProvider(config=diffusion_config)
+            provider = AnimateDiffProvider(config=diffusion_config)
             compiler = DiffusersCompiler(config=diffusion_config)
             
         provider.load()
@@ -438,7 +438,7 @@ class NovelFactoryAPI:
             # shape, so every item in a batch must share resolution/steps/cfg.
             # Sharing the same character set too keeps the single shared
             # ip_adapter_image conditioning meaningful for the whole batch.
-            pending = [e for e in manifest.prompts if not (self.workspace.outputs_dir / f"{e.shot_id}.png").exists()]
+            pending = [e for e in manifest.prompts if not (self.workspace.outputs_dir / f"{e.shot_id}.mp4").exists()]
             skipped = len(manifest.prompts) - len(pending)
             if skipped:
                 logger.info(f"Skipping {skipped} already-rendered shot(s).")
@@ -462,20 +462,21 @@ class NovelFactoryAPI:
             if current_batch:
                 batches.append(current_batch)
 
+            from diffusers.utils import export_to_video
             for batch in batches:
                 if len(batch) == 1:
                     entry, refs = batch[0]
                     request = build_request(entry, refs)
-                    image = provider.generate(request)
-                    image.save(self.workspace.outputs_dir / f"{entry.shot_id}.png")
+                    frames = provider.generate(request)
+                    export_to_video(frames, str(self.workspace.outputs_dir / f"{entry.shot_id}.mp4"), fps=8)
                     logger.info(f"Rendered {entry.shot_id}")
                     continue
 
                 requests = [build_request(entry, refs) for entry, refs in batch]
                 try:
-                    images = provider.generate_batch(requests)
-                    for (entry, _), image in zip(batch, images):
-                        image.save(self.workspace.outputs_dir / f"{entry.shot_id}.png")
+                    frames_batch = provider.generate_batch(requests)
+                    for (entry, _), frames in zip(batch, frames_batch):
+                        export_to_video(frames, str(self.workspace.outputs_dir / f"{entry.shot_id}.mp4"), fps=8)
                         logger.info(f"Rendered {entry.shot_id} (batch of {len(batch)})")
                 except Exception as e:
                     logger.warning(
@@ -484,8 +485,8 @@ class NovelFactoryAPI:
                     )
                     for entry, refs in batch:
                         request = build_request(entry, refs)
-                        image = provider.generate(request)
-                        image.save(self.workspace.outputs_dir / f"{entry.shot_id}.png")
+                        frames = provider.generate(request)
+                        export_to_video(frames, str(self.workspace.outputs_dir / f"{entry.shot_id}.mp4"), fps=8)
                         logger.info(f"Rendered {entry.shot_id}")
                 
             logger.info("Rendering phase complete.")
@@ -503,11 +504,13 @@ class NovelFactoryAPI:
             renderer = FFmpegVideoRenderer()
             
         from core.domain.assets.execution import FrameManifest, FrameEntry
-        image_files = sorted(self.workspace.outputs_dir.glob("*.png"))
+        video_files = sorted(self.workspace.outputs_dir.glob("*.mp4"))
+        # Exclude the final_video.mp4 if it already exists
+        video_files = [f for f in video_files if f.name != "final_video.mp4"]
         
         manifest = FrameManifest(frames=[
             FrameEntry(shot_id=f.stem, image_path=f)
-            for f in image_files
+            for f in video_files
         ])
         
         audio_dir = self.workspace.base_dir / "audio"

@@ -24,18 +24,18 @@ class FFmpegVideoRenderer(VideoRendererProvider):
             for entry in manifest.frames:
                 # Normalizing paths for ffmpeg (forward slashes even on Windows)
                 safe_path = entry.image_path.absolute().as_posix()
-                
-                duration = 3.0
-                if entry.shot_id in audio_map:
-                    wav_path = audio_map[entry.shot_id]
-                    try:
-                        with wave.open(str(wav_path), 'r') as w:
-                            duration = max(2.0, w.getnframes() / w.getframerate())
-                    except Exception:
-                        duration = 3.0
-                        
                 f.write(f"file '{safe_path}'\n")
-                f.write(f"duration {duration}\n")
+                
+                if safe_path.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    duration = 3.0
+                    if entry.shot_id in audio_map:
+                        wav_path = audio_map[entry.shot_id]
+                        try:
+                            with wave.open(str(wav_path), 'r') as w:
+                                duration = max(2.0, w.getnframes() / w.getframerate())
+                        except Exception:
+                            duration = 3.0
+                    f.write(f"duration {duration}\n")
         
         silent_output = output_path.parent / "silent_video.mp4"
         

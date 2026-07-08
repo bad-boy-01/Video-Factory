@@ -452,3 +452,160 @@ class DiffusersProvider(ImageGenerationProvider):
         flush_vram("Diffusion unloaded")
 
 LocalDiffusionProvider = DiffusersProvider
+
+class AnimateDiffProvider(ImageGenerationProvider):
+    def __init__(self, config: DiffusionConfig = None):
+        import torch
+        self.config = config
+        self.pipeline = None
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._ip_adapter_loaded = False
+        
+    def capabilities(self):
+        from plugins.interfaces import ProviderCapability
+        return ProviderCapability(modality="video", supports_lora=False)
+        
+    def load(self) -> None:
+        if self.pipeline is not None:
+            return
+            
+        import torch
+        from diffusers import AnimateDiffPipeline, MotionAdapter, EulerDiscreteScheduler
+        
+        logger.info(f"[Resource] Loading AnimateDiff into VRAM...")
+        
+        adapter = MotionAdapter.from_pretrained(
+            "guoyww/animatediff-motion-adapter-v1-5-2", 
+            torch_dtype=torch.float16,
+            cache_dir=self.config.cache_dir
+        )
+        
+        model_id = "runwayml/stable-diffusion-v1-5"
+        if self.config.model_id and "sdxl" not in self.config.model_id.lower():
+             model_id = self.config.model_id
+             
+        self.pipeline = AnimateDiffPipeline.from_pretrained(
+            model_id,
+            motion_adapter=adapter,
+            torch_dtype=torch.float16,
+            cache_dir=self.config.cache_dir
+        )
+        
+        self.pipeline.scheduler = EulerDiscreteScheduler.from_config(
+            self.pipeline.scheduler.config,
+            timestep_spacing="trailing"
+        )
+        
+        try:
+            self.pipeline.load_ip_adapter(
+                "h94/IP-Adapter", subfolder="models", weight_name="ip-adapter_sd15.bin"
+            )
+            self.pipeline.set_ip_adapter_scale(0.6)
+            self._ip_adapter_loaded = True
+            logger.info("[Resource] IP-Adapter loaded for AnimateDiff.")
+        except Exception as e:
+            logger.warning(f"[Resource] IP-Adapter failed to load for AnimateDiff ({e})")
+            
+        if self.device == "cuda":
+            if self.config.cpu_offload:
+                self.pipeline.enable_model_cpu_offload()
+            else:
+                self.pipeline.to("cuda")
+                
+        self.pipeline.enable_vae_slicing()
+
+    def warmup(self) -> None:
+        pass
+
+    def _build_ip_adapter_image(self, ip_adapter_refs: dict):
+        if not ip_adapter_refs:
+            return None
+        try:
+            import numpy as np
+            from PIL import Image
+            paths = [p for p in ip_adapter_refs.values() if p]
+            imgs = []
+            for p in paths:
+                try:
+                    imgs.append(Image.open(p).convert("RGB").resize((256, 256), Image.LANCZOS))
+                except Exception as e:
+                    logger.warning(f"[IP-Adapter] Could not load reference {p}: {e}")
+            if not imgs:
+                return None
+            if len(imgs) == 1:
+                return imgs[0]
+            avg = np.mean([np.array(i, dtype=np.float32) for i in imgs], axis=0).astype(np.uint8)
+            return Image.fromarray(avg)
+        except Exception as e:
+            logger.warning(f"[IP-Adapter] Failed to build reference composite: {e}")
+            return None
+
+    def generate(self, request: ProviderRequest, callback=None):
+        if not self.pipeline:
+            self.load()
+            
+        import torch
+        generator = torch.Generator(device=self.device).manual_seed(request.generation.seed)
+        
+        def step_callback(step: int, timestep: int, latents: torch.Tensor):
+            if callback:
+                callback(step, request.generation.steps)
+
+        kwargs = dict(
+            prompt=request.conditioning.prompt,
+            negative_prompt=request.conditioning.negative_prompt,
+            num_inference_steps=20, # hardcoded for stability
+            guidance_scale=7.5,
+            num_frames=16,
+            width=512,
+            height=512,
+            generator=generator,
+            callback=step_callback,
+            callback_steps=1
+        )
+        
+        if self._ip_adapter_loaded and request.conditioning.ip_adapter:
+            img = self._build_ip_adapter_image(request.conditioning.ip_adapter)
+            if img:
+                kwargs["ip_adapter_image"] = img
+                self.pipeline.set_ip_adapter_scale(0.6)
+            else:
+                self.pipeline.set_ip_adapter_scale(0.0)
+                import numpy as np
+                from PIL import Image
+                kwargs["ip_adapter_image"] = Image.fromarray(np.zeros((256, 256, 3), dtype=np.uint8))
+        elif self._ip_adapter_loaded:
+             self.pipeline.set_ip_adapter_scale(0.0)
+             import numpy as np
+             from PIL import Image
+             kwargs["ip_adapter_image"] = Image.fromarray(np.zeros((256, 256, 3), dtype=np.uint8))
+
+        frames = self.pipeline(**kwargs).frames[0]
+        return frames
+
+    def generate_batch(self, requests: list, callback=None) -> list:
+        # Not implementing batching for AnimateDiff due to VRAM constraints
+        results = []
+        for r in requests:
+            results.append(self.generate(r, callback))
+        return results
+
+    def health_check(self) -> ProviderHealth:
+        import torch
+        loaded = self.pipeline is not None
+        vram = torch.cuda.memory_allocated() / (1024**3) if torch.cuda.is_available() else 0.0
+        return ProviderHealth(
+            loaded=loaded, 
+            device=self.device, 
+            model=self.config.model_id, 
+            dtype=self.config.dtype, 
+            vram_allocated_gb=vram
+        )
+        
+    def unload(self) -> None:
+        logger.info("[Resource] Unloading AnimateDiff...")
+        if self.pipeline:
+            del self.pipeline
+            self.pipeline = None
+        from core.utils.vram import flush_vram
+        flush_vram("Diffusion unloaded")
