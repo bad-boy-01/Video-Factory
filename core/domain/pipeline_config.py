@@ -16,7 +16,7 @@ class PipelineConfig(DomainModel):
     num_workers: int = 1
     precision: str = "fp16"
     dtype: str = "float16"
-    cache_dir: str = "workspace/models"
+    cache_dir: str = "/tmp/models"
     cpu_offload: bool = True
     use_face_id: bool = False  # opt-in: stronger facial identity via insightface + IP-Adapter-FaceID,
                                 # alongside (not replacing) the standard IP-Adapter reference conditioning

@@ -14,7 +14,7 @@ class ModelConfig(BaseModel):
     model_id: str = "stabilityai/stable-diffusion-xl-base-1.0"
     adapter: Optional[str] = "ByteDance/SDXL-Lightning"
     vae: Optional[str] = None
-    cache_dir: str = "/kaggle/working/hf_cache"
+    cache_dir: str = "/tmp/models"
     dtype: str = "float16"
     cpu_offload: bool = True
     

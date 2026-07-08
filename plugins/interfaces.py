@@ -26,7 +26,7 @@ from dataclasses import dataclass
 @dataclass
 class DiffusionConfig:
     model_id: str = "stabilityai/stable-diffusion-xl-base-1.0"
-    cache_dir: str = "workspace/models"
+    cache_dir: str = "/tmp/models"
     revision: str = "main"
     dtype: str = "float16"  # resolved to a real torch.dtype only inside providers that need torch
     cpu_offload: bool = True
