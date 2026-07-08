@@ -321,6 +321,14 @@ class DiffusersProvider(ImageGenerationProvider):
 
         logger.info(f"[Resource] Loading {self.config.model_id} into VRAM...")
         
+        # Use fp16 fix VAE to avoid Diffusers upcast_vae type mismatch bug on second call
+        from diffusers import AutoencoderKL
+        vae = AutoencoderKL.from_pretrained(
+            "madebyollin/sdxl-vae-fp16-fix",
+            torch_dtype=getattr(torch, self.config.dtype, torch.float16),
+            cache_dir=self.config.cache_dir
+        )
+        
         unet = None
         if self.config.adapter and "SDXL-Lightning" in self.config.adapter:
             # Handle specific adapter logic
@@ -336,6 +344,7 @@ class DiffusersProvider(ImageGenerationProvider):
             self.pipeline = StableDiffusionXLPipeline.from_pretrained(
                 self.config.model_id,
                 unet=unet,
+                vae=vae,
                 torch_dtype=getattr(torch, self.config.dtype, torch.float16),
                 variant="fp16",
                 use_safetensors=True,
@@ -344,6 +353,7 @@ class DiffusersProvider(ImageGenerationProvider):
         else:
             self.pipeline = StableDiffusionXLPipeline.from_pretrained(
                 self.config.model_id,
+                vae=vae,
                 torch_dtype=getattr(torch, self.config.dtype, torch.float16),
                 variant="fp16",
                 use_safetensors=True,
