@@ -53,7 +53,7 @@ class CharacterSheetsStage:
             char_dir.mkdir(parents=True, exist_ok=True)
 
             if not self.force and self._all_poses_exist(char_dir):
-                logger.info(f"[CharSheets] Skipping '{char_name}' - all 7 poses already exist.")
+                logger.info(f"[CharSheets] Skipping '{char_name}' - reference sheet already exists.")
                 skipped += 1
                 continue
 
