@@ -493,22 +493,35 @@ class NovelFactoryAPI:
             provider.unload()
 
     def assemble(self):
-        logger.info("Assembling Manhwa slideshow...")
-        
-        slideshow_dir = self.workspace.outputs_dir / "manhwa_slideshow"
-        slideshow_dir.mkdir(parents=True, exist_ok=True)
-        
+        logger.info("Assembling video clips from CAS assets...")
+        use_mock = os.environ.get("NOVELFACTORY_MOCK", "0") == "1"
+        if use_mock:
+            from plugins.mock_providers import MockVideoRenderer
+            renderer = MockVideoRenderer()
+        else:
+            from plugins.ffmpeg_renderer import FFmpegVideoRenderer
+            renderer = FFmpegVideoRenderer()
+            
+        from core.domain.assets.execution import FrameManifest, FrameEntry
         image_files = sorted(self.workspace.outputs_dir.glob("*.png"))
         
-        import shutil
-        panel_count = 0
-        for i, img_path in enumerate(image_files):
-            dest_name = f"panel_{i:03d}.png"
-            dest_path = slideshow_dir / dest_name
-            shutil.copy(img_path, dest_path)
-            panel_count += 1
-            
-        logger.info(f"Successfully assembled {panel_count} manhwa panels in {slideshow_dir}")
+        manifest = FrameManifest(frames=[
+            FrameEntry(shot_id=f.stem, image_path=f)
+            for f in image_files
+        ])
+        
+        audio_dir = self.workspace.base_dir / "audio"
+        audio_paths = sorted(audio_dir.glob("*.wav")) if audio_dir.exists() else []
+        
+        output_path = self.workspace.outputs_dir / "final_video.mp4"
+        try:
+            renderer.render_video(manifest=manifest, audio_paths=audio_paths, output_path=output_path)
+        except Exception as e:
+            logger.warning(
+                f"Final render failed ({e}) - retrying once. All images/audio "
+                "are already generated, so this only re-runs the encoding step."
+            )
+            renderer.render_video(manifest=manifest, audio_paths=audio_paths, output_path=output_path)
         logger.info("Assembly complete.")
 
     def export(self, format: str = "video"):
