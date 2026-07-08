@@ -1,0 +1,60 @@
+{
+  "description": "Defines the capabilities of a specific provider, ensuring that the RenderGraph\nknows what nodes can be safely executed with it.",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "modality": {
+      "default": "image",
+      "title": "Modality",
+      "type": "string"
+    },
+    "supports_controlnet": {
+      "default": false,
+      "title": "Supports Controlnet",
+      "type": "boolean"
+    },
+    "supports_ip_adapter": {
+      "default": false,
+      "title": "Supports Ip Adapter",
+      "type": "boolean"
+    },
+    "supports_lora": {
+      "default": false,
+      "title": "Supports Lora",
+      "type": "boolean"
+    },
+    "supports_img2img": {
+      "default": false,
+      "title": "Supports Img2Img",
+      "type": "boolean"
+    },
+    "max_resolution": {
+      "default": [
+        1024,
+        1024
+      ],
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Max Resolution",
+      "type": "array"
+    }
+  },
+  "title": "ProviderCapability",
+  "type": "object"
+}

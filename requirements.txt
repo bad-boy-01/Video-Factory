@@ -1,0 +1,23 @@
+# ── Already on Kaggle (pinned here as minimum-version guards) ─────────────────
+torch
+transformers>=4.40
+diffusers>=0.27.0
+accelerate
+
+# ── Must install (not on Kaggle by default) ──────────────────────────────────
+bitsandbytes>=0.46.1   # 4-bit quantisation for Qwen
+safetensors            # fast model checkpoint loading
+sentencepiece          # Qwen tokenizer
+huggingface_hub        # model/dataset download utilities
+requests                # optional cloud LLM fallback (plugins/cloud_llm.py)
+sentence-transformers  # RAG chunk retrieval index (core/memory/rag_index.py) - optional, degrades gracefully if absent
+pillow                 # image generation (PIL.Image.save)
+pydantic>=2.0          # domain models (v2 required)
+typing-extensions      # backport for older Python versions
+python-docx            # .docx novel input support
+ebooklib               # .epub novel input support
+
+# ── Optional: only needed if config.use_face_id is enabled (default False) ────
+# insightface             # Face-ID conditioning alongside IP-Adapter (plugins/local_diffusion.py)
+# onnxruntime             # required by insightface for face detection/embedding
+# opencv-python           # required by insightface for image loading (cv2)

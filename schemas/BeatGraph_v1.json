@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "BeatEdge": {
+      "properties": {
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "relationship": {
+          "enum": [
+            "causes",
+            "escalates",
+            "reveals",
+            "resolves",
+            "contrasts",
+            "parallels"
+          ],
+          "title": "Relationship",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "target_id",
+        "relationship"
+      ],
+      "title": "BeatEdge",
+      "type": "object"
+    },
+    "BeatNode": {
+      "properties": {
+        "beat_id": {
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "emotion": {
+          "title": "Emotion",
+          "type": "string"
+        },
+        "importance": {
+          "title": "Importance",
+          "type": "string"
+        }
+      },
+      "required": [
+        "beat_id",
+        "description",
+        "emotion",
+        "importance"
+      ],
+      "title": "BeatNode",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "scene_id": {
+      "title": "Scene Id",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/BeatNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/BeatEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    }
+  },
+  "required": [
+    "scene_id"
+  ],
+  "title": "BeatGraph",
+  "type": "object"
+}

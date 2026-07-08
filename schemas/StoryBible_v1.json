@@ -1,0 +1,402 @@
+{
+  "$defs": {
+    "Appearance": {
+      "properties": {
+        "hair": {
+          "default": "",
+          "title": "Hair",
+          "type": "string"
+        },
+        "eyes": {
+          "default": "",
+          "title": "Eyes",
+          "type": "string"
+        },
+        "face": {
+          "default": "",
+          "title": "Face",
+          "type": "string"
+        },
+        "age": {
+          "default": "",
+          "title": "Age",
+          "type": "string"
+        },
+        "body": {
+          "default": "",
+          "title": "Body",
+          "type": "string"
+        },
+        "color_palette": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Color Palette",
+          "type": "array"
+        },
+        "signature": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signature",
+          "type": "array"
+        }
+      },
+      "title": "Appearance",
+      "type": "object"
+    },
+    "BindingReference": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "priority": {
+          "default": 1,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "weight": {
+          "default": 1.0,
+          "title": "Weight",
+          "type": "number"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "BindingReference",
+      "type": "object"
+    },
+    "CharacterVisualProfile": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "appearance": {
+          "$ref": "#/$defs/Appearance"
+        },
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/BindingReference"
+          },
+          "title": "Bindings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "CharacterVisualProfile",
+      "type": "object"
+    },
+    "Location": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "appearance": {
+          "default": "",
+          "title": "Appearance",
+          "type": "string"
+        },
+        "architecture": {
+          "default": "",
+          "title": "Architecture",
+          "type": "string"
+        },
+        "weather_defaults": {
+          "default": "",
+          "title": "Weather Defaults",
+          "type": "string"
+        },
+        "time_defaults": {
+          "default": "",
+          "title": "Time Defaults",
+          "type": "string"
+        },
+        "lighting_presets": {
+          "default": "",
+          "title": "Lighting Presets",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "Organization": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "uniforms": {
+          "default": "",
+          "title": "Uniforms",
+          "type": "string"
+        },
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Organization",
+      "type": "object"
+    },
+    "Prop": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "visual_details": {
+          "default": "",
+          "title": "Visual Details",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Prop",
+      "type": "object"
+    },
+    "Relationship": {
+      "properties": {
+        "char1_id": {
+          "title": "Char1 Id",
+          "type": "string"
+        },
+        "char2_id": {
+          "title": "Char2 Id",
+          "type": "string"
+        },
+        "nature": {
+          "default": "",
+          "title": "Nature",
+          "type": "string"
+        },
+        "dynamic": {
+          "default": "",
+          "title": "Dynamic",
+          "type": "string"
+        }
+      },
+      "required": [
+        "char1_id",
+        "char2_id"
+      ],
+      "title": "Relationship",
+      "type": "object"
+    },
+    "TimelineEvent": {
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "timestamp": {
+          "default": "",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id"
+      ],
+      "title": "TimelineEvent",
+      "type": "object"
+    },
+    "Vehicle": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "visual_details": {
+          "default": "",
+          "title": "Visual Details",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Vehicle",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "version": {
+      "default": 4,
+      "title": "Version",
+      "type": "integer"
+    },
+    "characters": {
+      "additionalProperties": {
+        "$ref": "#/$defs/CharacterVisualProfile"
+      },
+      "title": "Characters",
+      "type": "object"
+    },
+    "locations": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Location"
+      },
+      "title": "Locations",
+      "type": "object"
+    },
+    "organizations": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Organization"
+      },
+      "title": "Organizations",
+      "type": "object"
+    },
+    "props": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Prop"
+      },
+      "title": "Props",
+      "type": "object"
+    },
+    "vehicles": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Vehicle"
+      },
+      "title": "Vehicles",
+      "type": "object"
+    },
+    "wardrobe": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": "object"
+      },
+      "title": "Wardrobe",
+      "type": "object"
+    },
+    "visual_themes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Visual Themes",
+      "type": "array"
+    },
+    "symbolism": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Symbolism",
+      "type": "object"
+    },
+    "timeline": {
+      "items": {
+        "$ref": "#/$defs/TimelineEvent"
+      },
+      "title": "Timeline",
+      "type": "array"
+    },
+    "relationships": {
+      "items": {
+        "$ref": "#/$defs/Relationship"
+      },
+      "title": "Relationships",
+      "type": "array"
+    },
+    "style_guide": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Style Guide",
+      "type": "object"
+    },
+    "production_notes": {
+      "default": "",
+      "title": "Production Notes",
+      "type": "string"
+    }
+  },
+  "title": "StoryBible",
+  "type": "object"
+}

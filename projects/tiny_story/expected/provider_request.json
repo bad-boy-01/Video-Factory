@@ -1,0 +1,42 @@
+{
+  "request_type": "image",
+  "generation": {
+    "resolution": [
+      1024,
+      1024
+    ],
+    "seed": 42,
+    "steps": 25,
+    "cfg": 7.0,
+    "scheduler": "euler_a",
+    "frames": null,
+    "fps": null
+  },
+  "conditioning": {
+    "prompt": "(astronaut:1.2) desolate red plains of Mars, pale blue dot in sky",
+    "negative_prompt": "bad anatomy, low quality",
+    "controlnets": {},
+    "ip_adapter": {},
+    "reference_images": [],
+    "masks": {}
+  },
+  "bindings": {
+    "loras": [],
+    "embeddings": [],
+    "style_models": []
+  },
+  "postprocess": {
+    "upscale": false,
+    "restore_faces": false,
+    "interpolation": false
+  },
+  "metadata": {
+    "project_id": "tiny_story",
+    "scene_id": "scene_001",
+    "shot_id": "shot_001",
+    "render_id": "render_001",
+    "pipeline_version": "2.1.0",
+    "provider_name": "sdxl-lightning",
+    "fingerprint": "mock_hash"
+  }
+}

@@ -1,0 +1,473 @@
+{
+  "$defs": {
+    "Beat": {
+      "properties": {
+        "beat_id": {
+          "title": "Beat Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "emotion": {
+          "title": "Emotion",
+          "type": "string"
+        },
+        "shots": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Shot"
+          },
+          "title": "Shots",
+          "type": "array"
+        }
+      },
+      "required": [
+        "beat_id",
+        "description",
+        "emotion"
+      ],
+      "title": "Beat",
+      "type": "object"
+    },
+    "CastMember": {
+      "properties": {
+        "character_id": {
+          "title": "Character Id",
+          "type": "string"
+        },
+        "emotion": {
+          "default": "neutral",
+          "title": "Emotion",
+          "type": "string"
+        },
+        "pose": {
+          "default": "standing",
+          "title": "Pose",
+          "type": "string"
+        },
+        "visibility": {
+          "default": "foreground",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "interaction": {
+          "default": "none",
+          "title": "Interaction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "character_id"
+      ],
+      "title": "CastMember",
+      "type": "object"
+    },
+    "FrameInstruction": {
+      "properties": {
+        "image_asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Asset Id"
+        },
+        "transition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transition"
+        },
+        "duration": {
+          "default": 2.0,
+          "title": "Duration",
+          "type": "number"
+        }
+      },
+      "title": "FrameInstruction",
+      "type": "object"
+    },
+    "Scene": {
+      "properties": {
+        "scene_id": {
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "chapter": {
+          "title": "Chapter",
+          "type": "integer"
+        },
+        "start_offset": {
+          "title": "Start Offset",
+          "type": "integer"
+        },
+        "end_offset": {
+          "title": "End Offset",
+          "type": "integer"
+        },
+        "estimated_duration": {
+          "title": "Estimated Duration",
+          "type": "number"
+        },
+        "characters": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Characters",
+          "type": "array"
+        },
+        "location": {
+          "title": "Location",
+          "type": "string"
+        },
+        "emotion": {
+          "title": "Emotion",
+          "type": "string"
+        },
+        "beats": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Beat"
+          },
+          "title": "Beats",
+          "type": "array"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SceneState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "scene_id",
+        "chapter",
+        "start_offset",
+        "end_offset",
+        "estimated_duration",
+        "characters",
+        "location",
+        "emotion"
+      ],
+      "title": "Scene",
+      "type": "object"
+    },
+    "SceneState": {
+      "properties": {
+        "time": {
+          "default": "",
+          "title": "Time",
+          "type": "string"
+        },
+        "season": {
+          "default": "",
+          "title": "Season",
+          "type": "string"
+        },
+        "weather": {
+          "default": "",
+          "title": "Weather",
+          "type": "string"
+        },
+        "lighting": {
+          "default": "",
+          "title": "Lighting",
+          "type": "string"
+        },
+        "palette": {
+          "default": "",
+          "title": "Palette",
+          "type": "string"
+        },
+        "wardrobe_locks": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Wardrobe Locks",
+          "type": "object"
+        },
+        "hair_state": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Hair State",
+          "type": "object"
+        },
+        "damage_state": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Damage State",
+          "type": "object"
+        },
+        "prop_state": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Prop State",
+          "type": "object"
+        },
+        "vehicle_state": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Vehicle State",
+          "type": "object"
+        },
+        "environment_state": {
+          "default": "",
+          "title": "Environment State",
+          "type": "string"
+        }
+      },
+      "title": "SceneState",
+      "type": "object"
+    },
+    "Shot": {
+      "properties": {
+        "shot_id": {
+          "title": "Shot Id",
+          "type": "string"
+        },
+        "purpose": {
+          "default": "",
+          "title": "Purpose",
+          "type": "string"
+        },
+        "emotion": {
+          "default": "",
+          "title": "Emotion",
+          "type": "string"
+        },
+        "importance": {
+          "default": "",
+          "title": "Importance",
+          "type": "string"
+        },
+        "focus": {
+          "default": "",
+          "title": "Focus",
+          "type": "string"
+        },
+        "style": {
+          "default": "",
+          "title": "Style",
+          "type": "string"
+        },
+        "style_stack": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StyleStack"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "camera_type": {
+          "default": "",
+          "title": "Camera Type",
+          "type": "string"
+        },
+        "lens": {
+          "default": "",
+          "title": "Lens",
+          "type": "string"
+        },
+        "angle": {
+          "default": "",
+          "title": "Angle",
+          "type": "string"
+        },
+        "distance": {
+          "default": "",
+          "title": "Distance",
+          "type": "string"
+        },
+        "movement": {
+          "default": "",
+          "title": "Movement",
+          "type": "string"
+        },
+        "cast": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CastMember"
+          },
+          "title": "Cast",
+          "type": "array"
+        },
+        "duration": {
+          "default": 2.0,
+          "title": "Duration",
+          "type": "number"
+        },
+        "frames": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/FrameInstruction"
+          },
+          "title": "Frames",
+          "type": "array"
+        }
+      },
+      "required": [
+        "shot_id"
+      ],
+      "title": "Shot",
+      "type": "object"
+    },
+    "StyleProfile": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "camera": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Camera",
+          "type": "object"
+        },
+        "lighting": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Lighting",
+          "type": "object"
+        },
+        "composition": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Composition",
+          "type": "object"
+        },
+        "color": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Color",
+          "type": "object"
+        },
+        "editing": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Editing",
+          "type": "object"
+        },
+        "motion": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Motion",
+          "type": "object"
+        },
+        "lens": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Lens",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "StyleProfile",
+      "type": "object"
+    },
+    "StyleStack": {
+      "properties": {
+        "base_cinematic": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StyleProfile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "project_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StyleProfile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scene_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StyleProfile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "beat_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StyleProfile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "StyleStack",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "scenes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Scene"
+      },
+      "title": "Scenes",
+      "type": "array"
+    }
+  },
+  "title": "SceneManifest",
+  "type": "object"
+}

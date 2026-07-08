@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "LogicalRenderPlan": {
+      "properties": {
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "framing": {
+          "default": "",
+          "title": "Framing",
+          "type": "string"
+        },
+        "emphasis": {
+          "default": "",
+          "title": "Emphasis",
+          "type": "string"
+        },
+        "mood": {
+          "default": "",
+          "title": "Mood",
+          "type": "string"
+        }
+      },
+      "title": "LogicalRenderPlan",
+      "type": "object"
+    },
+    "PhysicalRenderPlan": {
+      "properties": {
+        "width": {
+          "default": 1024,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "default": 1024,
+          "title": "Height",
+          "type": "integer"
+        },
+        "steps": {
+          "default": 25,
+          "title": "Steps",
+          "type": "integer"
+        },
+        "cfg": {
+          "default": 7.0,
+          "title": "Cfg",
+          "type": "number"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "bindings": {
+          "items": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "title": "Bindings",
+          "type": "array"
+        },
+        "loras": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Loras",
+          "type": "array"
+        },
+        "controlnets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Controlnets",
+          "type": "array"
+        }
+      },
+      "title": "PhysicalRenderPlan",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "shot_id": {
+      "title": "Shot Id",
+      "type": "string"
+    },
+    "logical": {
+      "$ref": "#/$defs/LogicalRenderPlan"
+    },
+    "physical": {
+      "$ref": "#/$defs/PhysicalRenderPlan"
+    }
+  },
+  "required": [
+    "shot_id"
+  ],
+  "title": "RenderPlan",
+  "type": "object"
+}

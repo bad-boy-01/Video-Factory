@@ -1,0 +1,243 @@
+You are working on a Python project called NovelFactory. It is an AI pipeline
+that converts a novel text file into a video. The pipeline runs on Kaggle
+(free T4 GPU, 13 GB RAM, Python 3.10+).
+
+The architecture is a compiler: text goes through planning stages that produce
+intermediate JSON manifests, then rendering stages that generate images and
+audio, then FFmpeg assembles the final video.
+
+The project is structurally complete but NOT runnable. The central API class
+is a facade of empty stubs — none of the real pipeline stages are ever called.
+Your job is to fix this so `python main.py --project workspace compile all`
+produces a real video.
+
+─────────────────────────────────────────
+READ THESE FILES FIRST (understand before touching)
+─────────────────────────────────────────
+- main.py
+- core/api/compiler_api.py          ← broken, main target
+- core/pipeline/context.py          ← PipelineContext (frozen Pydantic model)
+- core/pipeline/compiler_context.py ← CompilerContext wraps PipelineContext
+- core/pipeline/stage.py            ← CompilerStage base class
+- core/rendering/executor.py        ← CompilerExecutor (the engine)
+- core/pipeline/reducer.py          ← ContextReducer (merges stage results)
+- core/contracts/router.py          ← ContractRouter
+- core/domain/project_manifest.py   ← ProjectManifest (needs source_text)
+- core/domain/workspace.py          ← WorkspaceManager
+- core/planning/chunker.py          ← first stage, reads source_text
+- core/planning/story_bible_stage.py
+- core/planning/scene_splitter.py
+- core/planning/cast_planner.py
+- core/planning/shot_planner.py
+- core/planning/camera_planner.py
+- core/optimization/prompt_builder.py
+- core/rendering/image_stage.py     ← broken imports
+- core/rendering/audio_stage.py
+- core/rendering/assembly_stage.py
+- plugins/local_llm.py              ← LLM provider (good, do not rewrite)
+- plugins/local_diffusion.py        ← diffusion provider (good, do not rewrite)
+- plugins/ffmpeg_renderer.py        ← broken, needs audio
+- plugins/audio/tts_provider.py
+- core/utils/vram.py
+
+─────────────────────────────────────────
+PROBLEMS TO FIX IN THIS EXACT ORDER
+─────────────────────────────────────────
+
+──────────────────────────────
+FIX 1 — core/api/compiler_api.py (MOST IMPORTANT)
+──────────────────────────────
+The methods plan(), render(), and assemble() currently contain only
+logger.info() calls. They do not call any real code.
+
+status() returns hardcoded fake numbers.
+doctor() returns hardcoded PASS for everything.
+benchmark() returns made-up timings.
+
+WHAT TO DO:
+
+A) Add a method _load_novel_text(self) -> str that:
+   - Looks for any .txt file inside self.project_dir/
+   - Reads and returns its contents
+   - Raises FileNotFoundError with a clear message if none found
+
+B) Rewrite plan() to:
+   1. Call _load_novel_text() to get the novel string
+   2. Build a ProjectManifest with source_text=<that string> and
+      novel_hash=hashlib.md5(text.encode()).hexdigest()
+   3. Build a PipelineContext with project_manifest=<manifest>,
+      execution_nodes=[], state={}
+   4. Build a CompilerContext wrapping the PipelineContext, plus
+      self.workspace, self.registry, and queue=None
+   5. Instantiate LocalLLMProvider(model_id=self.config.llm_model),
+      call llm.load()
+   6. Build stages list in this order:
+        ChunkerStage()
+        StoryBibleGeneratorStage(llm)
+        SceneSplitterStage(llm)
+        CastPlannerStage(llm)
+        ShotPlannerStage(llm)
+        CameraPlannerStage(llm)
+        PromptBuilderStage()
+   7. Build ContractRouter(contract_map={}) — empty map, no contracts yet
+   8. Run CompilerExecutor(stages=stages, contract_router=router).run(context)
+   9. Call llm.unload() in a finally block
+   10. Save the final context's story_bible and scene manifest to
+       self.workspace.manifests_dir as story_bible.json and scene_manifest.json
+   11. Return the final context
+
+C) Rewrite render() to:
+   1. Load prompt_manifest.json from self.workspace.manifests_dir
+      (written by PromptBuilderStage). If missing, raise RuntimeError
+      telling the user to run plan first.
+   2. Instantiate DiffusersProvider(config=self.config) and call provider.load()
+   3. Instantiate DiffusersCompiler()
+   4. Loop over each prompt entry, call compiler.compile_plan(entry) to get
+      a ProviderRequest, then provider.generate(request) to get a PIL Image
+   5. Save each image to self.workspace.outputs_dir/<shot_id>.png
+      Skip shots where the file already exists (crash resume)
+   6. Call provider.unload() in a finally block
+
+D) Rewrite assemble() to:
+   1. Instantiate FFmpegVideoRenderer()
+   2. Collect all .png files from self.workspace.outputs_dir in sorted order
+   3. Collect matching .wav files from self.workspace.base_dir/audio/
+   4. Build a FrameManifest from the image list
+   5. Call renderer.render_video(manifest, audio_paths,
+      self.workspace.outputs_dir / "final_video.mp4")
+
+E) Rewrite doctor() to actually check the environment:
+   - torch importable? torch.cuda.is_available()?
+   - diffusers importable?
+   - ffmpeg in PATH (subprocess.run ["ffmpeg", "-version"])?
+   - workspace dirs exist and are writable?
+   - Free disk > 10 GB?
+   Return real PASS/FAIL/WARN for each check.
+
+F) Rewrite status() to read real data:
+   - Count .png files in outputs_dir for rendered count
+   - Count entries in prompt_manifest.json for total shots
+   - Read story_bible.json for scene count
+   - Check GPU via torch if available
+
+──────────────────────────────
+FIX 2 — core/rendering/image_stage.py
+──────────────────────────────
+The file uses RenderNode, RenderArtifact, and RenderGraph but never imports
+them. They are defined in core/rendering/render_queue.py.
+
+Add these imports at the top of image_stage.py:
+  from core.rendering.render_queue import RenderNode, RenderArtifact, RenderGraph
+
+Then check that DiffusionRendererStage.execute() actually loops over the
+PromptManifest entries from context.execution_nodes and calls the RenderGraph
+for each one. Currently it has a comment saying "We would loop here" and
+returns 0 jobs processed. Replace that comment with the real loop.
+
+──────────────────────────────
+FIX 3 — plugins/ffmpeg_renderer.py
+──────────────────────────────
+render_video() currently hardcodes 2 seconds per frame and ignores audio.
+
+Fix it to:
+1. Accept audio_paths as a list of Path objects (already in the signature)
+2. For each frame entry, check if a matching .wav exists in audio_paths
+   (match by stem: shot_018.png matches shot_018.wav)
+3. If a .wav exists, get its duration with:
+     import wave
+     with wave.open(str(wav_path), 'r') as w:
+         duration = w.getnframes() / w.getframerate()
+   Use that duration in the concat list. Minimum 2.0 seconds.
+4. If no .wav exists, use 3.0 seconds as the default duration
+5. After generating the silent video, if any audio exists, use ffmpeg
+   to mix in the audio with -shortest flag
+
+──────────────────────────────
+FIX 4 — ProjectManifest missing source_text field
+──────────────────────────────
+Open core/domain/project_manifest.py.
+Add:
+  source_text: str = ""
+
+This field is read by ChunkerStage in its execute() method. Without it,
+ChunkerStage crashes immediately.
+
+──────────────────────────────
+FIX 5 — plugins/interfaces.py duplicate method
+──────────────────────────────
+ImageGenerationProvider Protocol defines generate() twice with different
+signatures. Remove the second definition (the one that takes a RenderJob).
+Keep the one with signature: generate(request: ProviderRequest, callback=None)
+
+──────────────────────────────
+FIX 6 — PipelineConfig missing llm_model field
+──────────────────────────────
+Open core/domain/pipeline_config.py.
+Add:
+  llm_model: str = "Qwen/Qwen1.5-4B-Chat"
+  diffusion_model: str = "stabilityai/stable-diffusion-xl-base-1.0"
+  cache_dir: str = "workspace/models"
+  dtype: str = "float16"
+  cpu_offload: bool = True
+
+compiler_api.py uses self.config.llm_model and self.config.diffusion_model
+but PipelineConfig currently has neither field.
+
+──────────────────────────────
+FIX 7 — core/rendering/audio_stage.py
+──────────────────────────────
+AudioGenerationStage.execute() calls self.tts.generate_voice() but
+plugins/audio/tts_provider.py may not have this method. Read both files.
+Make the method names consistent. The output .wav files must be saved to
+workspace/audio/<beat_id>.wav so assemble() can find them.
+
+─────────────────────────────────────────
+DO NOT TOUCH
+─────────────────────────────────────────
+- plugins/local_llm.py — the LLM provider with 4-bit quant and JSON caching
+  is correct. Do not rewrite it.
+- plugins/local_diffusion.py — do not rewrite the DiffusersProvider class.
+- All files in core/domain/ — the domain models are correct.
+- All planning stage files in core/planning/ — they work, just not called.
+- core/rendering/executor.py — the CompilerExecutor is correct.
+- schemas/ — do not touch JSON schemas.
+
+─────────────────────────────────────────
+THINGS TO LEAVE AS STUBS (roadmap items)
+─────────────────────────────────────────
+These are documented future milestones. Leave them as logger.info stubs:
+- graph() — DOT visualization
+- explain() — provenance tracing
+- validate() / repair()
+- LoRA and ControlNet support in the diffusion provider
+
+─────────────────────────────────────────
+KAGGLE CONSTRAINTS TO KEEP IN MIND
+─────────────────────────────────────────
+- GPU RAM is 13 GB. The LLM must be unloaded before diffusion loads.
+  compiler_api.plan() must call llm.unload() before compile() calls render().
+- Always use cpu_offload=True for the diffusion pipeline.
+- All file writes go inside the workspace/ directory tree.
+- The project directory (--project arg) is where the novel .txt lives.
+  The workspace/ directory is where all generated artifacts go.
+
+─────────────────────────────────────────
+HOW TO VERIFY YOUR FIXES WORK
+─────────────────────────────────────────
+After making changes, run this smoke test:
+
+  cd NovelFactory-main
+  python -c "
+  from core.api.compiler_api import NovelFactoryAPI
+  api = NovelFactoryAPI(project_dir='projects/tiny_story')
+  print(api.doctor())
+  print(api.status())
+  "
+
+Then run the real pipeline in mock mode (models will use MockProvider):
+
+  python main.py --project projects/tiny_story compile all
+
+The project at projects/tiny_story/novel.txt already exists with sample text.
+The pipeline should run all stages end to end and produce
+workspace/outputs/final_video.mp4 even with mock providers.

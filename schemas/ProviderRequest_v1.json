@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "BindingParams": {
+      "properties": {
+        "loras": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Loras",
+          "type": "array"
+        },
+        "embeddings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Embeddings",
+          "type": "array"
+        },
+        "style_models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Style Models",
+          "type": "array"
+        }
+      },
+      "title": "BindingParams",
+      "type": "object"
+    },
+    "ConditioningParams": {
+      "properties": {
+        "prompt": {
+          "default": "",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "negative_prompt": {
+          "default": "",
+          "title": "Negative Prompt",
+          "type": "string"
+        },
+        "controlnets": {
+          "additionalProperties": true,
+          "title": "Controlnets",
+          "type": "object"
+        },
+        "ip_adapter": {
+          "additionalProperties": true,
+          "title": "Ip Adapter",
+          "type": "object"
+        },
+        "reference_images": {
+          "items": {},
+          "title": "Reference Images",
+          "type": "array"
+        },
+        "masks": {
+          "additionalProperties": true,
+          "title": "Masks",
+          "type": "object"
+        }
+      },
+      "title": "ConditioningParams",
+      "type": "object"
+    },
+    "GenerationParams": {
+      "properties": {
+        "resolution": {
+          "default": [
+            1024,
+            1024
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Resolution",
+          "type": "array"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "steps": {
+          "default": 25,
+          "title": "Steps",
+          "type": "integer"
+        },
+        "cfg": {
+          "default": 7.0,
+          "title": "Cfg",
+          "type": "number"
+        },
+        "scheduler": {
+          "default": "euler_a",
+          "title": "Scheduler",
+          "type": "string"
+        },
+        "frames": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frames"
+        },
+        "fps": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fps"
+        }
+      },
+      "title": "GenerationParams",
+      "type": "object"
+    },
+    "PostProcessParams": {
+      "properties": {
+        "upscale": {
+          "default": false,
+          "title": "Upscale",
+          "type": "boolean"
+        },
+        "restore_faces": {
+          "default": false,
+          "title": "Restore Faces",
+          "type": "boolean"
+        },
+        "interpolation": {
+          "default": false,
+          "title": "Interpolation",
+          "type": "boolean"
+        }
+      },
+      "title": "PostProcessParams",
+      "type": "object"
+    },
+    "ProviderMetadata": {
+      "properties": {
+        "project_id": {
+          "default": "",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "scene_id": {
+          "default": "",
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "shot_id": {
+          "default": "",
+          "title": "Shot Id",
+          "type": "string"
+        },
+        "render_id": {
+          "default": "",
+          "title": "Render Id",
+          "type": "string"
+        },
+        "pipeline_version": {
+          "default": "2.1",
+          "title": "Pipeline Version",
+          "type": "string"
+        },
+        "provider_name": {
+          "default": "",
+          "title": "Provider Name",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "fingerprint": {
+          "default": "",
+          "title": "Fingerprint",
+          "type": "string"
+        }
+      },
+      "title": "ProviderMetadata",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "request_type": {
+      "default": "image",
+      "enum": [
+        "image",
+        "video"
+      ],
+      "title": "Request Type",
+      "type": "string"
+    },
+    "generation": {
+      "$ref": "#/$defs/GenerationParams"
+    },
+    "conditioning": {
+      "$ref": "#/$defs/ConditioningParams"
+    },
+    "bindings": {
+      "$ref": "#/$defs/BindingParams"
+    },
+    "postprocess": {
+      "$ref": "#/$defs/PostProcessParams"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ProviderMetadata"
+    }
+  },
+  "title": "ProviderRequest",
+  "type": "object"
+}
