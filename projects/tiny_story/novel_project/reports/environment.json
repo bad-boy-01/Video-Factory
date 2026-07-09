@@ -1,0 +1,7 @@
+{
+  "python": "3.10.6",
+  "os": "Windows",
+  "torch": "mock_version",
+  "cuda": "mock_version",
+  "diffusers": "mock_version"
+}

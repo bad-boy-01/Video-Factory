@@ -1,0 +1,25 @@
+{
+  "id": "320a7f81-f53a-484e-817c-6c2d62e42cbd",
+  "created_at": "2026-07-08T16:48:06.287380",
+  "scenes": [
+    {
+      "scene_id": "scene_591971e1",
+      "chapter": 1,
+      "start_offset": 0,
+      "end_offset": 122,
+      "estimated_duration": 10.0,
+      "characters": [],
+      "location": "Unknown",
+      "emotion": "Neutral",
+      "beats": [
+        {
+          "beat_id": "beat_mock_001",
+          "description": "Fallback scene action.",
+          "emotion": "Neutral",
+          "shots": []
+        }
+      ],
+      "state": null
+    }
+  ]
+}

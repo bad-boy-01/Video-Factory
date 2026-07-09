@@ -47,6 +47,7 @@ class ShotPlannerStage(CompilerStage):
             raise ValueError("No SceneManifest found in context.")
             
         schema = {
+            "scene_style": "string (narrative | motion | montage)",
             "beats": [
                 {
                     "beat_id": "string",
@@ -71,7 +72,11 @@ class ShotPlannerStage(CompilerStage):
             prompt = f"""
 You are a master cinematographer and film editor. Expand the following narrative beats into a cinematic shot sequence (coverage).
 CRITICAL RULES:
-- Film editors think in coverage. Provide 3 to 6 shots per beat.
+- First, choose one of three Cinematic Styles for this scene based on the beats:
+  1. NARRATIVE: Focuses on dialogue, character interaction, and story progression. Use standard coverage (Establishing -> Medium -> Close-ups/Reactions). Duration: 2.0s - 4.0s.
+  2. MOTION/ACTION: Focuses on speed, kinetic clarity, and physical conflict. Use rapid tracking, intense pacing, and fast cuts. Duration: 1.0s - 2.5s.
+  3. MONTAGE: Focuses on internal emotion and passage of time via visual juxtaposition. Limit dialogue, focus on objects/expressions. Duration: 1.0s - 2.0s.
+- Provide 3 to 6 shots per beat depending on the chosen style.
 - Start a scene with an Establishing shot.
 - Use distinct purposes like 'Reaction', 'Over shoulder', 'Insert object', 'Close-up'.
 - Do NOT output the physical camera parameters (like 50mm or eye-level). Output semantic intent: purpose, emotion, importance, and focus.
@@ -93,8 +98,9 @@ Beats:
                 
             if not result_dict.get("beats"):
                 logger.warning(f"LLM generated no shots, injecting fallback shot for scene {scene.scene_id}")
-                result_dict = {"beats": [{"shots": [{"purpose": "establishing", "emotion": "neutral", "importance": "high", "focus": "environment", "duration": 3.0}]}]}
+                result_dict = {"scene_style": "narrative", "beats": [{"shots": [{"purpose": "establishing", "emotion": "neutral", "importance": "high", "focus": "environment", "duration": 3.0}]}]}
                 
+            scene_style = result_dict.get("scene_style", "narrative").lower()
             shot_idx = 0
             for beat_idx, beat_cov in enumerate(result_dict.get("beats", [])):
                 # Prefer positional correspondence to the scene's actual beats
@@ -108,6 +114,13 @@ Beats:
                     shot_idx += 1
                     shot_id = f"shot_{scene_hash}_{shot_idx:03d}"
                     
+                    # Ensure duration adheres loosely to style guide if LLM failed
+                    duration = float(shot_data.get("duration", 2.0))
+                    if "motion" in scene_style or "action" in scene_style:
+                        duration = min(max(duration, 0.5), 2.5)
+                    elif "montage" in scene_style:
+                        duration = min(max(duration, 0.5), 2.0)
+                        
                     shot = Shot(
                         shot_id=shot_id,
                         beat_id=beat_id,
@@ -115,7 +128,7 @@ Beats:
                         emotion=shot_data.get("emotion", "neutral"),
                         importance=shot_data.get("importance", "medium"),
                         focus=shot_data.get("focus", "character"),
-                        duration=shot_data.get("duration", 2.0)
+                        duration=duration
                     )
                     all_shots.append(shot)
             

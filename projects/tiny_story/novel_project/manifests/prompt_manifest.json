@@ -1,0 +1,108 @@
+{
+  "id": "b5017146-0a12-418c-935f-61549f92dd81",
+  "created_at": "2026-07-08T16:48:06.313268",
+  "prompts": [
+    {
+      "prompt_id": "prompt_98359147",
+      "scene_id": "scene_591971e1",
+      "shot_id": "shot_09ab949f_001",
+      "ast": {
+        "subject": {
+          "description": "establishing shot emphasizing environment"
+        },
+        "characters": [],
+        "environment": {
+          "location": "Unknown",
+          "time_of_day": "day",
+          "weather": "clear"
+        },
+        "camera": {
+          "type": "cinematic",
+          "lens": "24mm",
+          "angle": "eye-level",
+          "distance": "wide shot",
+          "movement": "slow dolly in"
+        },
+        "lighting": {
+          "style": "cinematic lighting"
+        },
+        "composition": {
+          "style": "cinematic framing"
+        },
+        "mood": {
+          "mood": ""
+        },
+        "quality": {
+          "tags": [
+            "masterpiece",
+            "high resolution",
+            "intricate detail"
+          ]
+        },
+        "technical": {
+          "steps": 25,
+          "cfg": 7.0,
+          "sampler": "Euler a",
+          "width": 1024,
+          "height": 1024
+        },
+        "negative": {
+          "tags": [
+            "low quality",
+            "blurry",
+            "distorted",
+            "bad anatomy",
+            "watermark"
+          ]
+        }
+      },
+      "visual_scene": {
+        "subject": "establishing shot emphasizing environment",
+        "characters": [],
+        "environment": {
+          "location_desc": "Unknown",
+          "time": "day",
+          "season": "",
+          "weather": "clear",
+          "lighting": "cinematic lighting",
+          "palette": "",
+          "environment_state": ""
+        },
+        "camera": {
+          "type": "cinematic",
+          "lens": "24mm",
+          "angle": "eye-level",
+          "distance": "wide shot",
+          "movement": "slow dolly in"
+        },
+        "style": {
+          "composition": "cinematic framing",
+          "lighting_style": "cinematic lighting",
+          "color_grade": "",
+          "mood": "neutral",
+          "quality_tags": [
+            "masterpiece",
+            "high resolution",
+            "intricate detail"
+          ],
+          "negative_tags": [
+            "low quality",
+            "blurry",
+            "distorted",
+            "bad anatomy",
+            "watermark"
+          ]
+        },
+        "props": [],
+        "vehicles": [],
+        "width": 1024,
+        "height": 1024,
+        "steps": 25,
+        "cfg": 7.0,
+        "sampler": "Euler a"
+      },
+      "seed": 1763651140,
+      "model_target": "sdxl"
+    }
+  ]
+}

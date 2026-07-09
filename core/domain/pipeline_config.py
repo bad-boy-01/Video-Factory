@@ -6,7 +6,7 @@ class PipelineConfig(DomainModel):
     project_id: str = "default_project"
     planning_model: str = "gpt-4o"
     llm_model: str = "Qwen/Qwen1.5-4B-Chat"
-    diffusion_model: str = "stabilityai/stable-diffusion-xl-base-1.0"
+    diffusion_model: str = "runwayml/stable-diffusion-v1-5"
     render_preset: str = "fast"
     scheduler: str = "euler_a"
     cache: bool = True

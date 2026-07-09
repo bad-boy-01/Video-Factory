@@ -1,32 +1,57 @@
 # Agent Handoff & Context Document
 
 **Instructions for future AI Agents**: 
-When the user attaches new Kaggle logs or asks you to fix an issue, **READ THIS DOCUMENT FIRST**. It contains critical context about the architecture, recent changes, and environment constraints.
+When the user attaches new Kaggle logs or asks you to fix an issue, **READ THIS DOCUMENT FIRST**. It contains critical context about the architecture, recent changes, project rules, and environment constraints.
 
-## 1. What We Are Building
-We are building **NovelFactory**, a deterministic AI Film Compiler. 
-As described in the `README.md`, it is a "Generative Operating System" designed to convert unstructured text (novels/scripts) into temporally and visually coherent rendered videos. It relies on strict separation between:
-1. **Creative Planning**: Parsing text into scenes, characters, and shots.
-2. **GPU Orchestration**: Rendering frames (or video clips) deterministically.
-3. **Assembly**: Using FFmpeg to compile the final video with audio.
+---
 
-## 2. Recent Major Architectural Pivot (Local Text-To-Video)
-- **Goal**: The user wants animated video clips generated *directly* from the script while maintaining character consistency, rather than a slideshow of static images.
-- **Implementation**: We implemented **Option 2** (Local Animation) by introducing `AnimateDiffProvider` in `plugins/local_diffusion.py`. 
-- **Tech Stack**: It uses `AnimateDiffPipeline` with the `guoyww/animatediff-motion-adapter-v1-5-2` adapter (Stable Diffusion 1.5).
-- **Character Consistency**: We still load the `IP-Adapter` (using `ip-adapter_sd15.bin`) and feed it the `reference_sheet.png` generated during the planning stage. This forces the AnimateDiff video output to maintain the same characters across different video clips.
-- **Assembly**: `core/api/compiler_api.py` and `plugins/ffmpeg_renderer.py` have been updated to output `.mp4` video clips (16 frames each) instead of `.png` images, and stitch these video clips seamlessly using FFmpeg concat.
+## 1. Project Rules & Guidelines
+The following rules apply specifically to the NovelFactory project workspace and must be followed strictly by all agents:
 
-## 3. Kaggle Environment Constraints & Fixes
-- **VRAM Limitations**: Kaggle (T4 x2) has 16GB VRAM per GPU. SDXL AnimateDiff is too heavy, which is why the video generation stage explicitly falls back to SD1.5. 
-- **Storage / Disk Space Bloat**: Previously, downloading massive model weights (SD1.5, AnimateDiff, IP-Adapter, Qwen LLM) to `/kaggle/working/workspace/models` resulted in a 6.6GB Kaggle output zip file (since Kaggle automatically zips everything in `/kaggle/working` at the end of a run). 
-- **The Fix**: The `cache_dir` for diffusion models and presets has been permanently changed to `/tmp/models/` in `plugins/interfaces.py`, `core/domain/pipeline_config.py`, and `core/domain/rendering/presets.py`. `/tmp/` is ignored by Kaggle's output zipping mechanism.
+- **Kaggle Environment Optimization**: When implementing model downloading or caching logic (e.g., HuggingFace pipelines, Diffusers), **always** override the default `cache_dir` to `/tmp/models`. This prevents the `/kaggle/working/` directory from bloating and exceeding disk space limits during execution.
+- **Deterministic Pipeline Architecture**: NovelFactory is a deterministic AI video compiler, not a generic text-to-video API wrapper. Never replace structured JSON schema stages (e.g., `SceneSplitterStage`, `ShotPlannerStage`) with free-form LLM prose generation. To integrate new cinematic styles or features (like ViMax styles), extend the JSON schemas with explicit metadata fields (like `scene_style` and `duration` limits) instead of relying on the LLM to output unconstrained paragraphs.
+- **Agent Handoff Protocol**: At the start of every session, read the `AGENT_HANDOFF.md` file in its entirety to understand the current state of the project. At the end of every session, append new logs and architectural updates to `AGENT_HANDOFF.md`. This guarantees context continuity across agent sessions, as the user frequently clears previous chat histories.
 
-## 4. ViMax Context
-- The repository contains a `ViMax-main` module. ViMax was evaluated earlier, but it relies heavily on external Cloud APIs (Doubao/Omni-Flash) for video generation. 
-- The user explicitly requested to proceed with the **local, on-device animation approach (AnimateDiff)** to ensure we can strictly enforce character consistency via IP-Adapter, which is difficult to guarantee with external APIs.
+---
 
-## 5. Next Steps for the AI
+## 2. How NovelFactory Works: The AI Film Compiler
+NovelFactory is an end-to-end "AI Film Compiler" that converts raw unstructured text (such as a novel or a screenplay) into a fully animated, temporally coherent video. Unlike generic text-to-video APIs (like Sora or Runway) where you type a paragraph and hope for a good video, NovelFactory acts as a **deterministic operating system**. It breaks down the generation process into strict, mathematically controlled stages to guarantee character consistency and narrative accuracy.
+
+Here is the complete step-by-step breakdown of how the engine works:
+
+### Phase A: Creative Planning (The Compiler Frontend)
+In this phase, we use Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) to understand the story and build a blueprint for the video.
+1. **ChunkerStage**: A typical novel has 100,000+ words. An LLM cannot read this all at once. The Chunker breaks the text into manageable blocks (chunks) while maintaining overlaps so context is never lost.
+2. **StoryBibleGeneratorStage**: Reads the chunks and extracts "Global Constants": characters, locations, and lore. It creates a definitive "Story Bible" so the AI remembers that the protagonist has "blue eyes and a scar" throughout the entire film.
+3. **SceneSplitterStage**: Slices the text chunks into exact narrative "Scenes". It keeps mathematical track of character offsets so not a single sentence of the original book is skipped.
+4. **ShotPlannerStage (with ViMax Cinematic Logic)**: Converts narrative beats into a cinematic shot list. It acts as the "Director". It automatically classifies the scene style. If the scene is an **Action/Motion** scene, it forces rapid cuts (1.0 - 2.0s duration). If it's a **Narrative** scene, it uses standard coverage (Establishing -> Over-the-shoulder -> Close-up) with longer durations.
+5. **CastPlanner & CameraPlanner**: Assign the specific global characters to the shots, and calculate virtual camera movements (pans, tilts, zooms).
+6. **PromptBuilderStage**: Translates all this JSON metadata into highly optimized comma-separated tags (positive and negative prompts) that diffusion models natively understand.
+
+### Phase B: Rendering (The GPU Backend)
+In this phase, we use local Stable Diffusion pipelines to generate the actual pixels. 
+1. **Local Diffusion (AnimateDiff)**: We bypass static images entirely and use **AnimateDiff** (specifically `animatediff-motion-adapter-v1-5-2`) to generate 16-frame video clips directly from the text prompts.
+2. **Character Consistency (IP-Adapter)**: To prevent characters from shape-shifting between shots, we inject an **IP-Adapter**. We generate a `reference_sheet.png` for our cast, and IP-Adapter forces the diffusion model to use the exact facial features from that reference sheet in every single video clip.
+3. **VRAM Optimization**: Because we run on constrained hardware (like Kaggle's dual 16GB T4 GPUs), we lock the pipeline to Stable Diffusion 1.5. We also route all HuggingFace cache downloads to `/tmp/models` to prevent disk bloat.
+4. **Resumable Queue**: All render jobs are stored in a SQLite database. If the GPU crashes on Shot #45, the system will instantly resume rendering from Shot #45 upon reboot.
+
+### Phase C: Assembly (The Linker)
+The final phase stitches all the disparate assets into a seamless movie.
+1. **Audio Generation**: We generate dialogue and sound effects (using TTS systems like Kokoro) to match the pacing dictated by the ShotPlanner.
+2. **FFmpeg Renderer**: A deterministic script takes the 100+ generated `.mp4` video clips, applies crossfades, overlays subtitles (typography), syncs the audio tracks, and outputs the final Master Video File. 
+
+---
+
+## 3. Next Steps for the AI
 1. Read the newly attached `kaggle_log.txt` or whatever logs the user provides.
 2. Identify the failure point (e.g., VRAM Out of Memory, FFmpeg stitch failure, AnimateDiff tensor mismatch).
-3. Apply fixes adhering to the architecture described above. Do **NOT** revert to static image generation unless explicitly instructed by the user.
+3. Apply fixes adhering to the deterministic architecture described above. Do **NOT** revert to static image generation unless explicitly instructed.
+4. **Append** a summary of any new architectural decisions you make to the end of this document.
+
+---
+
+## Agent Updates
+
+**Date**: 2026-07-09
+**Issue Fixed**: AnimateDiff crashed with `ValueError: Incompatible Motion Adapter, got different number of blocks` during the rendering phase.
+**Resolution/Decision**: The `diffusion_model` / `model_id` configuration defaulted to `stabilityai/stable-diffusion-xl-base-1.0`. Since the project architecture is strictly locked to Stable Diffusion 1.5 for the AnimateDiff video backend (`animatediff-motion-adapter-v1-5-2`), loading an SDXL base model caused a tensor shape mismatch. The default model has been updated to `runwayml/stable-diffusion-v1-5` across `DiffusionConfig`, `ModelConfig`, and `RenderingConfig` to restore compatibility and comply with the VRAM/architecture requirements.

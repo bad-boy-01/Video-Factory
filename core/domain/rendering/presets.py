@@ -11,7 +11,7 @@ class RenderPreset(BaseModel):
     negative_prompt: str = ""
     
 class ModelConfig(BaseModel):
-    model_id: str = "stabilityai/stable-diffusion-xl-base-1.0"
+    model_id: str = "runwayml/stable-diffusion-v1-5"
     adapter: Optional[str] = "ByteDance/SDXL-Lightning"
     vae: Optional[str] = None
     cache_dir: str = "/tmp/models"

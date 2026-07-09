@@ -1,0 +1,17 @@
+digraph CompilerDAG {
+  rankdir=TB;
+  node [shape=box, style=filled, fillcolor=lightgray];
+  "ChunkerStage" [shape=ellipse, fillcolor=lightblue];
+  "StoryBibleGeneratorStage" [shape=ellipse, fillcolor=lightblue];
+  "StoryBibleGeneratorStage" -> "story_bible";
+  "SceneSplitterStage" [shape=ellipse, fillcolor=lightblue];
+  "ShotPlannerStage" [shape=ellipse, fillcolor=lightblue];
+  "ShotPlannerStage" -> "shot_manifest";
+  "CastPlannerStage" [shape=ellipse, fillcolor=lightblue];
+  "CastPlannerStage" -> "shot_manifest_with_cast";
+  "CameraPlannerStage" [shape=ellipse, fillcolor=lightblue];
+  "CameraPlannerStage" -> "shot_manifest_with_camera";
+  "PromptBuilderStage" [shape=ellipse, fillcolor=lightblue];
+  "PromptBuilderStage" -> "prompt_manifest";
+  "AudioGenerationStage" [shape=ellipse, fillcolor=lightblue];
+}
