@@ -317,20 +317,37 @@ class DiffusersProvider(ImageGenerationProvider):
             return
 
         import torch
-        from diffusers import StableDiffusionXLPipeline, UNet2DConditionModel
+        
+        is_sdxl = "sdxl" in self.config.model_id.lower() or "xl" in self.config.model_id.lower()
 
         logger.info(f"[Resource] Loading {self.config.model_id} into VRAM...")
         
-        # Use fp16 fix VAE to avoid Diffusers upcast_vae type mismatch bug on second call
         from diffusers import AutoencoderKL
-        vae = AutoencoderKL.from_pretrained(
-            "madebyollin/sdxl-vae-fp16-fix",
-            torch_dtype=getattr(torch, self.config.dtype, torch.float16),
-            cache_dir=self.config.cache_dir
-        )
+        if is_sdxl:
+            from diffusers import StableDiffusionXLPipeline as PipelineClass
+            from diffusers import UNet2DConditionModel
+            # Use fp16 fix VAE to avoid Diffusers upcast_vae type mismatch bug on second call
+            vae = AutoencoderKL.from_pretrained(
+                "madebyollin/sdxl-vae-fp16-fix",
+                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
+                cache_dir=self.config.cache_dir
+            )
+            ip_subfolder = "sdxl_models"
+            ip_weight = "ip-adapter_sdxl.bin"
+        else:
+            from diffusers import StableDiffusionPipeline as PipelineClass
+            from diffusers import UNet2DConditionModel
+            # Standard VAE for SD1.5
+            vae = AutoencoderKL.from_pretrained(
+                "stabilityai/sd-vae-ft-mse",
+                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
+                cache_dir=self.config.cache_dir
+            )
+            ip_subfolder = "models"
+            ip_weight = "ip-adapter_sd15.bin"
         
         unet = None
-        if self.config.adapter and "SDXL-Lightning" in self.config.adapter:
+        if self.config.adapter and "SDXL-Lightning" in self.config.adapter and is_sdxl:
             # Handle specific adapter logic
             unet = UNet2DConditionModel.from_pretrained(
                 self.config.adapter,
@@ -340,29 +357,25 @@ class DiffusersProvider(ImageGenerationProvider):
             )
         
         # Load the base model
+        kwargs = {
+            "vae": vae,
+            "torch_dtype": getattr(torch, self.config.dtype, torch.float16),
+            "use_safetensors": True,
+            "cache_dir": self.config.cache_dir,
+            "variant": "fp16"
+        }
         if unet:
-            self.pipeline = StableDiffusionXLPipeline.from_pretrained(
-                self.config.model_id,
-                unet=unet,
-                vae=vae,
-                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
-                variant="fp16",
-                use_safetensors=True,
-                cache_dir=self.config.cache_dir
-            )
-        else:
-            self.pipeline = StableDiffusionXLPipeline.from_pretrained(
-                self.config.model_id,
-                vae=vae,
-                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
-                variant="fp16",
-                use_safetensors=True,
-                cache_dir=self.config.cache_dir
-            )
+            kwargs["unet"] = unet
+            
+        try:
+            self.pipeline = PipelineClass.from_pretrained(self.config.model_id, **kwargs)
+        except Exception:
+            kwargs.pop("variant", None)
+            self.pipeline = PipelineClass.from_pretrained(self.config.model_id, **kwargs)
             
         try:
             self.pipeline.load_ip_adapter(
-                "h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter_sdxl.bin"
+                "h94/IP-Adapter", subfolder=ip_subfolder, weight_name=ip_weight
             )
             self.pipeline.set_ip_adapter_scale(0.6)
             self._ip_adapter_loaded = True

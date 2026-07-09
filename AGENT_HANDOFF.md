@@ -55,3 +55,7 @@ The final phase stitches all the disparate assets into a seamless movie.
 **Date**: 2026-07-09
 **Issue Fixed**: AnimateDiff crashed with `ValueError: Incompatible Motion Adapter, got different number of blocks` during the rendering phase.
 **Resolution/Decision**: The `diffusion_model` / `model_id` configuration defaulted to `stabilityai/stable-diffusion-xl-base-1.0`. Since the project architecture is strictly locked to Stable Diffusion 1.5 for the AnimateDiff video backend (`animatediff-motion-adapter-v1-5-2`), loading an SDXL base model caused a tensor shape mismatch. The default model has been updated to `runwayml/stable-diffusion-v1-5` across `DiffusionConfig`, `ModelConfig`, and `RenderingConfig` to restore compatibility and comply with the VRAM/architecture requirements.
+
+**Date**: 2026-07-09
+**Issue Fixed**: character_sheets() failed ('NoneType' object has no attribute 'tokenize') and IP-Adapter expected shape [320, 768] but got [640, 2048] during the rendering phase.
+**Resolution/Decision**: The previous fix changed the base model to Stable Diffusion 1.5, but DiffusersProvider (used by character_sheets) was hardcoded to use StableDiffusionXLPipeline and load SDXL's IP-Adapter weights. Updated DiffusersProvider in plugins/local_diffusion.py to dynamically select StableDiffusionPipeline or StableDiffusionXLPipeline, and the corresponding IP-Adapter bin (ip-adapter_sd15.bin vs ip-adapter_sdxl.bin), based on whether 'sdxl' is in the model_id.
