@@ -80,6 +80,38 @@ class FFmpegVideoRenderer(VideoRendererProvider):
             # nothing (0 bytes of video data written). Per-shot duration is
             # already derived from that shot's own audio, so video and audio
             # are already closely aligned without it.
+            import json
+            
+            # Pass 1: Measure loudness
+            measure_cmd = [
+                "ffmpeg", "-hide_banner",
+                "-f", "concat", "-safe", "0", "-i", str(audio_concat_file),
+                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json",
+                "-f", "null", "-"
+            ]
+            
+            try:
+                print("[FFMPEG] Measuring audio loudness...")
+                measure_result = subprocess.run(measure_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                # FFmpeg writes the JSON summary to stderr at the end
+                stderr_output = measure_result.stderr
+                # Find the JSON block. It usually starts with { and ends with }
+                json_start = stderr_output.find("{")
+                json_end = stderr_output.rfind("}")
+                if json_start != -1 and json_end != -1:
+                    loudness_data = json.loads(stderr_output[json_start:json_end+1])
+                    measured_i = loudness_data.get("input_i", "-24")
+                    measured_tp = loudness_data.get("input_tp", "-2")
+                    measured_lra = loudness_data.get("input_lra", "7")
+                    measured_thresh = loudness_data.get("input_thresh", "-34")
+                    measured_offset = loudness_data.get("target_offset", "0")
+                else:
+                    raise ValueError("Could not find loudness JSON in stderr.")
+            except Exception as e:
+                print(f"[FFMPEG] Loudness measurement failed: {e}. Falling back to default loudnorm.")
+                measured_i, measured_tp, measured_lra, measured_thresh, measured_offset = "-24", "-2", "7", "-34", "0"
+
+            # Pass 2: Apply loudness normalization and mix
             mix_cmd = [
                 "ffmpeg", "-y", 
                 "-i", str(silent_output),
@@ -87,11 +119,12 @@ class FFmpegVideoRenderer(VideoRendererProvider):
                 "-map", "0:v:0",
                 "-map", "1:a:0",
                 "-c:v", "copy",
+                "-af", f"loudnorm=I=-16:TP=-1.5:LRA=11:measured_I={measured_i}:measured_TP={measured_tp}:measured_LRA={measured_lra}:measured_thresh={measured_thresh}:offset={measured_offset}:linear=true:print_format=summary,aformat=sample_rates=48000:channel_layouts=stereo",
                 "-c:a", "aac",
                 str(output_path)
             ]
             try:
-                print("[FFMPEG] Mixing audio...")
+                print("[FFMPEG] Mixing audio with loudness normalization...")
                 subprocess.run(mix_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 print(f"[FFMPEG] Final render complete: {output_path}")
             except subprocess.CalledProcessError as e:

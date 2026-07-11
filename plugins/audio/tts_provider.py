@@ -38,7 +38,14 @@ class KokoroTTSProvider(TTSProvider):
         return self._pipeline
 
     def generate_voice(self, text: str, voice_id: str, output_path: str) -> float:
+        import re
         text = (text or "").strip() or "..."
+        
+        # Kokoro TTS (specifically KPipeline) automatically splits chunks by '\n+'.
+        # We ensure long utterances don't rush or truncate by forcing newlines 
+        # after sentence boundaries.
+        text = re.sub(r'([.?!])\s+', r'\1\n', text)
+        
         voice = voice_id if (voice_id and voice_id != "default") else self.default_voice
 
         try:
