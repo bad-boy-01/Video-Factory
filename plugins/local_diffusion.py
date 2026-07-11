@@ -71,32 +71,41 @@ class DiffusersCompiler(ProviderCompiler):
         self.config = config
 
     def compile_plan(self, plan: RenderPlan) -> ProviderRequest:
-        # Build SDXL Prompt from LogicalRenderPlan
         logical = plan.logical
-        
-        # 1. Subject (Highest Weight)
-        sections = []
-        if logical.subject:
-            sections.append(f"({logical.subject}:1.2)")
-            
-        # 2. Framing & Atmosphere
-        if logical.framing:
-            sections.append(f"({logical.framing}:1.1)")
-        if logical.mood:
-            sections.append(f"({logical.mood}:1.0)")
-        if logical.emphasis:
-            sections.append(f"({logical.emphasis}:0.9)")
-            
-        prompt_str = "(Korean manhwa style:1.3), (webtoon art style:1.2), cel-shaded, vibrant colors, " + " ".join(sections)
-        negative_str = "3d, realistic, photography, low quality, blurry, distorted, bad anatomy, watermark"
-        
+
+        if logical.full_prompt:
+            # PromptBuilderStage provided a pre-assembled, fully-enriched prompt —
+            # use it directly. It already contains style tokens, character appearance,
+            # scene state, camera, and quality boosters.
+            prompt_str = logical.full_prompt
+            negative_str = logical.full_negative or (
+                "low quality, blurry, distorted, bad anatomy, watermark, text"
+            )
+        else:
+            # Legacy fallback: reconstruct from sparse logical fields.
+            sections = []
+            if logical.subject:
+                sections.append(f"({logical.subject}:1.2)")
+            if logical.framing:
+                sections.append(f"({logical.framing}:1.1)")
+            if logical.mood:
+                sections.append(f"({logical.mood}:1.0)")
+            if logical.emphasis:
+                sections.append(f"({logical.emphasis}:0.9)")
+            prompt_str = (
+                "(Korean manhwa style:1.3), (webtoon art style:1.2), cel-shaded, vibrant colors, "
+                + " ".join(sections)
+            )
+            negative_str = "3d, realistic, photography, low quality, blurry, distorted, bad anatomy, watermark"
+
         from core.domain.prompt.provider_request import GenerationParams, ConditioningParams, BindingParams
         return ProviderRequest(
             request_type="image",
             generation=GenerationParams(
                 resolution=(plan.physical.width, plan.physical.height),
                 steps=plan.physical.steps,
-                cfg=0.0 if self.config and self.config.adapter and "Lightning" in self.config.adapter else plan.physical.cfg,
+                cfg=0.0 if self.config and self.config.adapter and "Lightning" in self.config.adapter
+                    else plan.physical.cfg,
                 seed=plan.physical.seed
             ),
             conditioning=ConditioningParams(
@@ -108,6 +117,7 @@ class DiffusersCompiler(ProviderCompiler):
                 loras=plan.physical.loras
             )
         )
+
 
 class DiffusersProvider(ImageGenerationProvider):
     def __init__(self, config: DiffusionConfig = None):

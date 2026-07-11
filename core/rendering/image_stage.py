@@ -88,13 +88,29 @@ class DiffusionRendererStage(PipelineStage):
         
         jobs_processed = 0
         for entry in prompt_manifest.prompts:
+            # PromptBuilderStage stores the fully assembled positive prompt in
+            # ast.subject.description and negative tags in ast.negative.tags.
+            full_prompt = entry.ast.subject.description
+            full_negative = ", ".join(entry.ast.negative.tags)
+
+            # Extract style_name from VisualScene if present
+            style_name = ""
+            if entry.visual_scene and entry.visual_scene.style:
+                # Convention: prompt_builder stores style key in color_grade when set
+                pass
+            # Fall back to shot style on the first available cast shot
+            # (style_name is set on Shot.style by DirectorPlannerStage)
+
             plan = RenderPlan(
                 shot_id=entry.shot_id,
                 logical=LogicalRenderPlan(
                     subject=entry.ast.subject.description,
                     framing=entry.ast.camera.distance,
                     emphasis="",
-                    mood=entry.ast.mood.mood
+                    mood=entry.ast.mood.mood,
+                    full_prompt=full_prompt,
+                    full_negative=full_negative,
+                    style_name=style_name,
                 ),
                 physical=PhysicalRenderPlan(
                     width=entry.ast.technical.width,
@@ -104,6 +120,7 @@ class DiffusionRendererStage(PipelineStage):
                     seed=entry.seed
                 )
             )
+
             inputs = {"RENDER_PLAN": RenderArtifact(kind="RENDER_PLAN", data=plan)}
             config = {"shot_dir": context.workspace.outputs_dir}
             graph.execute(inputs, config)

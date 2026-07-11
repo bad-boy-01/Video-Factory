@@ -7,6 +7,12 @@ class LogicalRenderPlan(BaseModel):
     framing: str = ""
     emphasis: str = ""
     mood: str = ""
+    # Pre-assembled prompt strings produced by PromptBuilderStage.
+    # When set, DiffusersCompiler uses these directly instead of
+    # reconstructing from the sparse logical fields above.
+    full_prompt: str = ""
+    full_negative: str = ""
+    style_name: str = ""  # director style (e.g. "villeneuve", "webtoon")
 
 class PhysicalRenderPlan(BaseModel):
     width: int = 1024
