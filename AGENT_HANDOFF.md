@@ -59,3 +59,7 @@ The final phase stitches all the disparate assets into a seamless movie.
 **Date**: 2026-07-09
 **Issue Fixed**: character_sheets() failed ('NoneType' object has no attribute 'tokenize') and IP-Adapter expected shape [320, 768] but got [640, 2048] during the rendering phase.
 **Resolution/Decision**: The previous fix changed the base model to Stable Diffusion 1.5, but DiffusersProvider (used by character_sheets) was hardcoded to use StableDiffusionXLPipeline and load SDXL's IP-Adapter weights. Updated DiffusersProvider in plugins/local_diffusion.py to dynamically select StableDiffusionPipeline or StableDiffusionXLPipeline, and the corresponding IP-Adapter bin (ip-adapter_sd15.bin vs ip-adapter_sdxl.bin), based on whether 'sdxl' is in the model_id.
+
+**Date**: 2026-07-11
+**Issue Fixed**: Stable Diffusion 1.5 Token Limit Truncation (Token indices sequence length > 77) during rendering phase.
+**Resolution/Decision**: `PromptBuilderStage` previously appended long scene state and environment descriptions before critical character and camera details, causing the most important visual anchors to be discarded by the 77-token CLIP limit. Reordered the string assembly in `core/optimization/prompt_builder.py` to prioritize style, characters, and camera constraints before environmental and beat description fields.

@@ -75,13 +75,44 @@ def _build_prompt(
     # 1. Art / rendering style (highest weight anchor)
     parts.append(style["positive"])
 
-    # 2. Scene description from beat — this is the actual visual content
+    # 2. Characters — appearance, pose, emotion
+    char_parts = []
+    for cm in shot.cast:
+        char_tags = _build_character_tags(cm, bible)
+        if char_tags:
+            char_parts.append(char_tags)
+    if char_parts:
+        parts.append(", ".join(char_parts))
+
+    # 3. Camera — framing, angle, movement
+    cam_tags = []
+    dist_tag = DISTANCE_TAGS.get(shot.distance, shot.distance)
+    if dist_tag: cam_tags.append(dist_tag)
+    angle_tag = ANGLE_TAGS.get(shot.angle, shot.angle)
+    if angle_tag: cam_tags.append(angle_tag)
+    if shot.movement and shot.movement not in ("static", ""):
+        cam_tags.append(shot.movement)
+    if shot.lens:
+        cam_tags.append(f"{shot.lens} lens")
+    if cam_tags:
+        parts.append(", ".join(cam_tags))
+
+    # 4. Quality boosters
+    parts.append("masterpiece, intricate detail, sharp focus")
+
+    # 5. Scene description from beat — this is the actual visual content
     if beat and beat.description:
         parts.append(beat.description)
     elif scene:
         parts.append(scene.location)
 
-    # 3. Environment state (time, weather, palette from VisualContinuityStage)
+    # 6. Mood / emotion
+    if shot.emotion and shot.emotion != "neutral":
+        parts.append(f"{shot.emotion} mood")
+
+    # 7. Environment state (time, weather, palette from VisualContinuityStage)
+    # (Pushed to the end because if it gets truncated by the 77-token limit,
+    # the shot still retains its primary visual and structural anchors).
     if scene and scene.state:
         s = scene.state
         env_parts = []
@@ -101,35 +132,6 @@ def _build_prompt(
             loc = bible.locations[scene.location]
             if loc.time_defaults:    parts.append(loc.time_defaults)
             if loc.weather_defaults: parts.append(loc.weather_defaults)
-
-    # 4. Characters — appearance, pose, emotion
-    char_parts = []
-    for cm in shot.cast:
-        char_tags = _build_character_tags(cm, bible)
-        if char_tags:
-            char_parts.append(char_tags)
-    if char_parts:
-        parts.append(", ".join(char_parts))
-
-    # 5. Camera — framing, angle, movement
-    cam_tags = []
-    dist_tag = DISTANCE_TAGS.get(shot.distance, shot.distance)
-    if dist_tag: cam_tags.append(dist_tag)
-    angle_tag = ANGLE_TAGS.get(shot.angle, shot.angle)
-    if angle_tag: cam_tags.append(angle_tag)
-    if shot.movement and shot.movement not in ("static", ""):
-        cam_tags.append(shot.movement)
-    if shot.lens:
-        cam_tags.append(f"{shot.lens} lens")
-    if cam_tags:
-        parts.append(", ".join(cam_tags))
-
-    # 6. Mood / emotion
-    if shot.emotion and shot.emotion != "neutral":
-        parts.append(f"{shot.emotion} mood")
-
-    # 7. Quality boosters
-    parts.append("masterpiece, intricate detail, sharp focus")
 
     return ", ".join(p for p in parts if p)
 
