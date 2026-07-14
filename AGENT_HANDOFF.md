@@ -30,10 +30,10 @@ In this phase, we use Large Language Models (LLMs) and Retrieval-Augmented Gener
 
 ### Phase B: Rendering (The GPU Backend)
 In this phase, we use local Stable Diffusion pipelines to generate the actual pixels. 
-1. **Local Diffusion (AnimateDiff)**: We bypass static images entirely and use **AnimateDiff** (specifically `animatediff-motion-adapter-v1-5-2`) to generate 16-frame video clips directly from the text prompts.
-2. **Character Consistency (IP-Adapter)**: To prevent characters from shape-shifting between shots, we inject an **IP-Adapter**. We generate a `reference_sheet.png` for our cast, and IP-Adapter forces the diffusion model to use the exact facial features from that reference sheet in every single video clip.
-3. **VRAM Optimization**: Because we run on constrained hardware (like Kaggle's dual 16GB T4 GPUs), we lock the pipeline to Stable Diffusion 1.5. We also route all HuggingFace cache downloads to `/tmp/models` to prevent disk bloat.
-4. **Resumable Queue**: All render jobs are stored in a SQLite database. If the GPU crashes on Shot #45, the system will instantly resume rendering from Shot #45 upon reboot.
+1. **Local Diffusion (SDXL Lightning)**: We generate high-quality still images using `ByteDance/SDXL-Lightning` instead of direct video generation, prioritizing aesthetic quality and prompt adherence over temporal flickering.
+2. **Character Consistency (IP-Adapter & Memory)**: To prevent characters from shape-shifting between shots, we inject an **IP-Adapter** guided by a `reference_sheet.png`. The `CharacterVisualProfile` explicitly tracks continuity fields (`face_seed`, `wardrobe_locks`, `current_injuries`) which are appended to the prompt by the `PromptCompiler`.
+3. **ArtifactStore (CAS) & Incremental DAG**: Generated images are stored in a Content-Addressable Storage (CAS) system keyed by prompt hash. The `ArtifactDAG` monitors dependency hashes to skip upstream stages that haven't changed, offering extreme efficiency and chapter-level resumability.
+4. **ImageQA & Critic Loop**: Generated images undergo multi-metric evaluation (CLIP adherence, sharpness, OCR artifact detection). Failing images trigger a deterministic Critic feedback loop to revise the prompt and regenerate.
 
 ### Phase C: Assembly (The Linker)
 The final phase stitches all the disparate assets into a seamless movie.
@@ -70,5 +70,6 @@ The final phase stitches all the disparate assets into a seamless movie.
 1. **Rendering Backend Swap**: Replaced AnimateDiff with SDXL Lightning (`ByteDance/SDXL-Lightning`) generating still images.
 2. **Direction Layer**: Introduced `NarrativeAnalyzer`, `StoryboardPlanner`, `CinematographyEngine` and `SceneGraphBuilder`. The LLM now focuses on facts (genre, emotion, entity mapping), while deterministic policy engines handle camera decisions and composition.
 3. **ArtifactStore & Image Bank**: Replaced `AssetRegistry` with a content-addressable `ArtifactStore`. Generated images are stored by `prompt_hash`, allowing instant reuse across shots with identical prompts, drastically saving Kaggle GPU time.
-4. **ImageQA & Critic Loop**: Built `ImageQAEvaluator` (evaluating CLIP score, sharpness, faces, OCR artifacts) and a deterministic `CriticFeedback` loop that revises failing prompts and regenerates.
 5. **Post-Production (FFmpeg)**: Upgraded `FFmpegVideoRenderer` to perform Ken Burns motion (zoompan) on the SDXL stills, crossfade transitions (xfade), and SRT subtitle burn-in.
+6. **Character Memory**: Upgraded `CharacterVisualProfile` to include strict continuity fields (`face_seed`, `current_outfit`, `current_injuries`, etc.) to enforce visual consistency across prompts.
+7. **Incremental Rebuilds (DAG)**: Built `ArtifactDAG` and wired it into `CompilerExecutor` to compute logical dependency hashes, safely skipping unmodified upstream pipeline stages.
