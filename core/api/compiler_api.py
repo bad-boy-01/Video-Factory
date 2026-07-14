@@ -1,6 +1,6 @@
 from core.domain.pipeline_config import PipelineConfig
 from core.domain.workspace import WorkspaceManager
-from core.domain.assets.registry import AssetRegistry
+from core.domain.assets.artifact_store import ArtifactStore
 from core.rendering.model_registry import ModelRegistry
 from typing import Optional, Any
 import logging
@@ -16,7 +16,7 @@ class NovelFactoryAPI:
     def __init__(self, project_dir: str):
         self.project_dir = project_dir
         self.workspace = WorkspaceManager(base_dir=project_dir)
-        self.registry = AssetRegistry()
+        self.store = ArtifactStore(self.workspace.base_dir)
         self.config = PipelineConfig()
         
     def use_model(self, model_id: str, **kwargs):
@@ -184,10 +184,15 @@ class NovelFactoryAPI:
 
             from core.planning.chunker import ChunkerStage
             from core.planning.story_bible_stage import StoryBibleGeneratorStage
+            from core.planning.narrative_analyzer import NarrativeAnalyzerStage
             from core.planning.scene_splitter import SceneSplitterStage
+            from core.planning.scene_graph import SceneGraphBuilderStage
+            from core.planning.visual_style_bible_stage import VisualStyleBibleStage
+            from core.planning.storyboard_planner import StoryboardPlannerStage
             from core.planning.cast_planner import CastPlannerStage
             from core.planning.shot_planner import ShotPlannerStage
-            from core.planning.camera_planner import CameraPlannerStage
+            from core.planning.cinematography_engine import CinematographyEngineStage
+            from core.planning.composition_planner import CompositionPlannerStage
             from core.optimization.prompt_builder import PromptBuilderStage
             from core.rendering.audio_stage import AudioGenerationStage
             from core.rendering.executor import CompilerExecutor
@@ -199,16 +204,23 @@ class NovelFactoryAPI:
             from core.memory.rag_index import NovelRAGIndex
             rag_index = NovelRAGIndex(cache_dir=str(self.workspace.cache_dir / "rag_index"))
 
+            cache_dir_str = str(self.workspace.cache_dir / "llm")
+
             stages = [
                 ChunkerStage(),
                 StoryBibleGeneratorStage(
                     llm, rag_index=rag_index,
                     history_path=str(self.workspace.manifests_dir / "character_history.json"),
                 ),
+                NarrativeAnalyzerStage(llm, cache_dir=cache_dir_str),
                 SceneSplitterStage(llm, rag_index=rag_index),
+                SceneGraphBuilderStage(llm, cache_dir=cache_dir_str),
+                VisualStyleBibleStage(),
+                StoryboardPlannerStage(llm, cache_dir=cache_dir_str),
                 ShotPlannerStage(llm),
                 CastPlannerStage(llm),
-                CameraPlannerStage(),
+                CinematographyEngineStage(),
+                CompositionPlannerStage(),
                 PromptBuilderStage(),
                 AudioGenerationStage(output_dir=audio_dir),
             ]
@@ -224,9 +236,33 @@ class NovelFactoryAPI:
 
             nodes = getattr(final_context, 'execution_nodes', getattr(final_context.pipeline, 'execution_nodes', []))
 
+            from core.domain.story.bible import StoryBible
+            from core.domain.scene.manifest import SceneManifest
+            from core.domain.prompt.ast import PromptManifest
+            from core.domain.story.director_manifest import DirectorManifest
+            from core.domain.scene.storyboard import StoryboardManifest
+            from core.domain.scene.graph import SceneGraphManifest
+            from core.domain.style.visual_style_bible import VisualStyleBible
+            from core.planning.composition_planner import CompositionManifest
+
             for node in nodes:
                 if isinstance(node.artifact, StoryBible):
                     with open(self.workspace.manifests_dir / "story_bible.json", "w", encoding="utf-8") as f:
+                        f.write(node.artifact.model_dump_json(indent=2))
+                elif isinstance(node.artifact, DirectorManifest):
+                    with open(self.workspace.manifests_dir / "director_manifest.json", "w", encoding="utf-8") as f:
+                        f.write(node.artifact.model_dump_json(indent=2))
+                elif isinstance(node.artifact, StoryboardManifest):
+                    with open(self.workspace.manifests_dir / "storyboard_manifest.json", "w", encoding="utf-8") as f:
+                        f.write(node.artifact.model_dump_json(indent=2))
+                elif isinstance(node.artifact, SceneGraphManifest):
+                    with open(self.workspace.manifests_dir / "scene_graph_manifest.json", "w", encoding="utf-8") as f:
+                        f.write(node.artifact.model_dump_json(indent=2))
+                elif isinstance(node.artifact, VisualStyleBible):
+                    with open(self.workspace.manifests_dir / "visual_style_bible.json", "w", encoding="utf-8") as f:
+                        f.write(node.artifact.model_dump_json(indent=2))
+                elif isinstance(node.artifact, CompositionManifest):
+                    with open(self.workspace.manifests_dir / "composition_manifest.json", "w", encoding="utf-8") as f:
                         f.write(node.artifact.model_dump_json(indent=2))
                 elif isinstance(node.artifact, SceneManifest):
                     with open(self.workspace.manifests_dir / "scene_manifest.json", "w", encoding="utf-8") as f:
@@ -356,43 +392,44 @@ class NovelFactoryAPI:
         return profile
 
     def render(self, config: Optional[PipelineConfig] = None):
+        """Render still images using DiffusersProvider (SDXL Lightning)."""
         if config:
             self.config = config
-        logger.info(f"Executing RenderGraph with model {self.config.diffusion_model}...")
-        
+        logger.info(f"Executing render with model {self.config.diffusion_model}...")
+
         manifest_path = self.workspace.manifests_dir / "prompt_manifest.json"
         if not manifest_path.exists():
             raise RuntimeError("prompt_manifest.json not found. Run plan first.")
-            
+
         from core.domain.prompt.ast import PromptManifest
         with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = PromptManifest.model_validate_json(f.read())
-            
+
         use_mock = os.environ.get("NOVELFACTORY_MOCK", "0") == "1"
         if use_mock:
             from plugins.local_diffusion import MockProvider, MockCompiler
             provider = MockProvider()
             compiler = MockCompiler()
         else:
-            from plugins.local_diffusion import AnimateDiffProvider, DiffusersCompiler
+            from plugins.local_diffusion import DiffusersProvider, DiffusersCompiler
             from plugins.interfaces import DiffusionConfig
-            
             diffusion_config = DiffusionConfig(
                 model_id=self.config.diffusion_model,
                 cache_dir=self.config.cache_dir,
                 dtype=self.config.dtype,
                 cpu_offload=self.config.cpu_offload,
             )
-            provider = AnimateDiffProvider(config=diffusion_config)
+            provider = DiffusersProvider(config=diffusion_config)
             compiler = DiffusersCompiler(config=diffusion_config)
-            
+
         provider.load()
-        
+
         try:
             from core.domain.prompt.render_plan import RenderPlan, LogicalRenderPlan, PhysicalRenderPlan
+            from core.rendering.image_qa import ImageQAEvaluator
             self.workspace.outputs_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Build a lookup of character reference images (reference_sheet pose)
+
+            # Build character reference image lookup
             chars_root = self.workspace.base_dir / "characters"
             char_ref_images: dict = {}
             if chars_root.exists():
@@ -401,13 +438,13 @@ class NovelFactoryAPI:
                     if ref.exists():
                         char_ref_images[char_dir.name] = str(ref)
             if char_ref_images:
-                logger.info(
-                    f"IP-Adapter references loaded for: {list(char_ref_images.keys())}"
-                )
+                logger.info(f"IP-Adapter references loaded for: {list(char_ref_images.keys())}")
+
+            # Initialise QA evaluator (CLIP runs on CPU, cached for the session)
+            qa_evaluator = ImageQAEvaluator(device="cpu")
+            previous_image_path = None  # Tracks last accepted image for continuity
 
             def refs_for_entry(entry) -> dict:
-                """Scope references to only the characters actually in this shot,
-                instead of injecting every known character into every request."""
                 names = [c.name for c in entry.ast.characters if c.name]
                 return {n: char_ref_images[n] for n in names if n in char_ref_images}
 
@@ -433,68 +470,86 @@ class NovelFactoryAPI:
                     request.conditioning.ip_adapter.update(refs)
                 return request
 
-            # ── Group not-yet-rendered shots into compatible batches ───────────
-            # A diffusers batch call is one forward pass over a single tensor
-            # shape, so every item in a batch must share resolution/steps/cfg.
-            # Sharing the same character set too keeps the single shared
-            # ip_adapter_image conditioning meaningful for the whole batch.
-            pending = [e for e in manifest.prompts if not (self.workspace.outputs_dir / f"{e.shot_id}.mp4").exists()]
+            # Image Bank: skip shots that already have a QA-passing image
+            pending = [
+                e for e in manifest.prompts
+                if not (self.workspace.outputs_dir / f"{e.shot_id}.png").exists()
+                and not self.store.exists_for_shot(e.shot_id, "image")
+            ]
             skipped = len(manifest.prompts) - len(pending)
             if skipped:
-                logger.info(f"Skipping {skipped} already-rendered shot(s).")
+                logger.info(f"Skipping {skipped} already-rendered shot(s) (Image Bank hit).")
 
-            max_batch = max(1, self.config.batch_size)
-            batches = []
-            current_batch = []
-            current_key = None
             for entry in pending:
+                output_path = self.workspace.outputs_dir / f"{entry.shot_id}.png"
                 refs = refs_for_entry(entry)
-                key = (
-                    entry.ast.technical.width, entry.ast.technical.height,
-                    entry.ast.technical.steps, entry.ast.technical.cfg,
-                    tuple(sorted(refs.keys())),
-                )
-                if current_batch and (key != current_key or len(current_batch) >= max_batch):
-                    batches.append(current_batch)
-                    current_batch = []
-                current_batch.append((entry, refs))
-                current_key = key
-            if current_batch:
-                batches.append(current_batch)
 
-            from diffusers.utils import export_to_video
-            for batch in batches:
-                if len(batch) == 1:
-                    entry, refs = batch[0]
-                    request = build_request(entry, refs)
-                    frames = provider.generate(request)
-                    export_to_video(frames, str(self.workspace.outputs_dir / f"{entry.shot_id}.mp4"), fps=8)
-                    logger.info(f"Rendered {entry.shot_id}")
+                # Image Bank: check if an identical prompt has already been generated
+                prompt_hash = hashlib.sha256(
+                    entry.ast.subject.description.encode("utf-8")
+                ).hexdigest()
+                existing = self.store.find_by_prompt_hash(prompt_hash, "image")
+                if existing:
+                    import shutil
+                    shutil.copy(existing.path, str(output_path))
+                    logger.info(f"Image Bank: reused {entry.shot_id} from {existing.shot_id}")
+                    self.store.register(
+                        output_path, "image", shot_id=entry.shot_id,
+                        generator="image_bank_reuse", seed=existing.seed,
+                        prompt_hash=prompt_hash,
+                        qa_scores=existing.qa_scores, qa_passed=True,
+                    )
+                    previous_image_path = str(output_path)
                     continue
 
-                requests = [build_request(entry, refs) for entry, refs in batch]
-                try:
-                    frames_batch = provider.generate_batch(requests)
-                    for (entry, _), frames in zip(batch, frames_batch):
-                        export_to_video(frames, str(self.workspace.outputs_dir / f"{entry.shot_id}.mp4"), fps=8)
-                        logger.info(f"Rendered {entry.shot_id} (batch of {len(batch)})")
-                except Exception as e:
-                    logger.warning(
-                        f"Batch generation failed ({e}) - falling back to "
-                        f"sequential generation for these {len(batch)} shot(s)."
+                request = build_request(entry, refs)
+                shot_purpose = entry.ast.camera.type or "mid"
+
+                # QA + Critic retry loop
+                from core.rendering.image_qa import evaluate_and_retry
+
+                def _generate(prompt, negative, seed, output_path):
+                    req = build_request(entry, refs)
+                    req.conditioning.prompt = prompt
+                    req.conditioning.negative_prompt = negative
+                    req.generation.seed = seed
+                    image = provider.generate(req)
+                    image.save(str(output_path))
+
+                accepted, qa_result, final_prompt, final_seed = evaluate_and_retry(
+                    generate_fn=_generate,
+                    positive_prompt=entry.ast.subject.description,
+                    negative_prompt=", ".join(entry.ast.negative.tags),
+                    seed=entry.seed,
+                    shot_id=entry.shot_id,
+                    shot_purpose=shot_purpose,
+                    output_path=output_path,
+                    evaluator=qa_evaluator,
+                    previous_image_path=Path(previous_image_path) if previous_image_path else None,
+                    max_retries=2,
+                )
+
+                # Register in ArtifactStore
+                if output_path.exists():
+                    self.store.register(
+                        output_path, "image",
+                        shot_id=entry.shot_id,
+                        generator=self.config.diffusion_model,
+                        seed=final_seed,
+                        prompt_hash=prompt_hash,
+                        qa_scores=qa_result.scores if qa_result else {},
+                        qa_passed=accepted,
                     )
-                    for entry, refs in batch:
-                        request = build_request(entry, refs)
-                        frames = provider.generate(request)
-                        export_to_video(frames, str(self.workspace.outputs_dir / f"{entry.shot_id}.mp4"), fps=8)
-                        logger.info(f"Rendered {entry.shot_id}")
-                
+                    previous_image_path = str(output_path)
+                    logger.info(f"Rendered {entry.shot_id} (QA: {'PASS' if accepted else 'BEST-AVAILABLE'})")
+
             logger.info("Rendering phase complete.")
         finally:
             provider.unload()
 
     def assemble(self):
-        logger.info("Assembling video clips from CAS assets...")
+        """Assemble still images into final video with Ken Burns, xfade transitions, and subtitles."""
+        logger.info("Assembling final video from rendered frames...")
         use_mock = os.environ.get("NOVELFACTORY_MOCK", "0") == "1"
         if use_mock:
             from plugins.mock_providers import MockVideoRenderer
@@ -502,29 +557,78 @@ class NovelFactoryAPI:
         else:
             from plugins.ffmpeg_renderer import FFmpegVideoRenderer
             renderer = FFmpegVideoRenderer()
-            
+
         from core.domain.assets.execution import FrameManifest, FrameEntry
-        video_files = sorted(self.workspace.outputs_dir.glob("*.mp4"))
-        # Exclude the final_video.mp4 if it already exists
-        video_files = [f for f in video_files if f.name != "final_video.mp4"]
-        
+
+        # Collect rendered PNG images (sorted by shot_id for correct order)
+        image_files = sorted(
+            self.workspace.outputs_dir.glob("*.png"),
+            key=lambda p: p.stem
+        )
+        image_files = [f for f in image_files if f.stem != "final_video"]
+
+        if not image_files:
+            raise RuntimeError("No .png files found in outputs_dir. Run render() first.")
+
         manifest = FrameManifest(frames=[
             FrameEntry(shot_id=f.stem, image_path=f)
-            for f in video_files
+            for f in image_files
         ])
-        
+
         audio_dir = self.workspace.base_dir / "audio"
         audio_paths = sorted(audio_dir.glob("*.wav")) if audio_dir.exists() else []
-        
+
+        # Build shot_movements from stored ArtifactStore or prompt_manifest
+        # (CinematographyEngineStage stores movement in shot.movement)
+        shot_movements: dict = {}
+        prompt_manifest_path = self.workspace.manifests_dir / "prompt_manifest.json"
+        if prompt_manifest_path.exists():
+            try:
+                from core.domain.prompt.ast import PromptManifest
+                with open(prompt_manifest_path, "r", encoding="utf-8") as f:
+                    pm = PromptManifest.model_validate_json(f.read())
+                for entry in pm.prompts:
+                    if entry.ast and entry.ast.camera:
+                        shot_movements[entry.shot_id] = entry.ast.camera.movement or "push_in"
+            except Exception as e:
+                logger.warning(f"Could not load shot_movements: {e}")
+
+        # Generate SRT subtitle file
+        subtitle_path = None
+        srt_path = self.workspace.base_dir / "audio" / "subtitles.srt"
+        try:
+            from core.rendering.subtitle_renderer import generate_srt_from_audio_manifest
+            from core.rendering.audio_stage import AudioManifest
+            audio_manifest_path = self.workspace.manifests_dir / "audio_manifest.json"
+            if audio_manifest_path.exists():
+                with open(audio_manifest_path, "r", encoding="utf-8") as f:
+                    audio_manifest = AudioManifest.model_validate_json(f.read())
+                shot_ids = [f.stem for f in image_files]
+                result = generate_srt_from_audio_manifest(audio_manifest, shot_ids, srt_path)
+                if result:
+                    subtitle_path = result
+                    logger.info(f"Generated subtitle file: {srt_path}")
+        except Exception as e:
+            logger.warning(f"Subtitle generation failed ({e}); assembling without subtitles.")
+
         output_path = self.workspace.outputs_dir / "final_video.mp4"
         try:
-            renderer.render_video(manifest=manifest, audio_paths=audio_paths, output_path=output_path)
-        except Exception as e:
-            logger.warning(
-                f"Final render failed ({e}) - retrying once. All images/audio "
-                "are already generated, so this only re-runs the encoding step."
+            renderer.render_video(
+                manifest=manifest,
+                audio_paths=audio_paths,
+                output_path=output_path,
+                subtitle_path=subtitle_path,
+                shot_movements=shot_movements,
             )
-            renderer.render_video(manifest=manifest, audio_paths=audio_paths, output_path=output_path)
+        except Exception as e:
+            logger.warning(f"Final render failed ({e}) - retrying once.")
+            renderer.render_video(
+                manifest=manifest,
+                audio_paths=audio_paths,
+                output_path=output_path,
+                subtitle_path=subtitle_path,
+                shot_movements=shot_movements,
+            )
         logger.info("Assembly complete.")
 
     def export(self, format: str = "video"):

@@ -24,6 +24,19 @@ class CharacterVisualProfile(BaseModel):
     name: str
     appearance: Appearance = Field(default_factory=Appearance)
     bindings: List[BindingReference] = Field(default_factory=list)
+    
+    # Extended continuity fields
+    face_seed: int = 0
+    face_embedding_path: str = ""
+    current_outfit: str = "default"
+    current_weapon: str = ""
+    current_injuries: List[str] = Field(default_factory=list)
+    current_emotional_state: str = "neutral"
+    age_visual: str = ""
+    height_relative: str = ""
+    dominant_colors: List[str] = Field(default_factory=list)
+    signature_pose: str = ""
+    ip_adapter_weight: float = 0.35
 
 class Location(BaseModel):
     id: str

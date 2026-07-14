@@ -46,73 +46,34 @@ class CompilerExecutor:
             candidate_result = None
             invalidation_reasons = []
             
-            # The executor orchestrates the hashing instead of the stage doing it manually
-            if hasattr(stage, "inputs") and hasattr(stage, "outputs"):
-                inputs = stage.inputs(current_context)
-                outputs = stage.outputs()
+            from core.utils.artifact_dag import ArtifactDAG
+            if hasattr(current_context, "workspace"):
+                dag = ArtifactDAG(str(current_context.workspace.workspace_dir))
                 
-                # Compute logical dependency hash for this stage
-                import hashlib
-                import json
-                dep_parts = []
-                for inp in inputs:
-                    if hasattr(inp, "metadata"):
-                        dep_parts.append(getattr(inp.metadata, "fingerprint", str(inp.metadata)))
-                    elif hasattr(inp, "fingerprint"):
-                        dep_parts.append(inp.fingerprint)
-                    else:
-                        dep_parts.append(str(inp)) # Fallback
-                
-                current_dep_hash = hashlib.sha256("_".join(dep_parts).encode()).hexdigest()
-                current_gen_sig = stage.generator_signature()
-                
-                # Check cache for outputs
-                if hasattr(current_context, "workspace"):
-                    for out_name in outputs:
-                        cache_file = current_context.workspace.manifests_dir / f"{out_name}.json"
-                        if cache_file.exists():
-                            with open(cache_file, "r", encoding="utf-8") as f:
-                                cached_data = json.load(f)
-                                
-                            metadata = cached_data.get("metadata", {})
-                            cached_dep_hash = metadata.get("dependency_hash")
-                            cached_gen_sig = metadata.get("generator_signature")
-                            cached_schema = metadata.get("schema_version")
-                            
-                            # Cache validation rules
-                            if cached_schema != "1.0":
-                                invalidation_reasons.append("schema version changed")
-                            if cached_gen_sig != current_gen_sig:
-                                invalidation_reasons.append("generator signature changed")
-                            if cached_dep_hash != current_dep_hash:
-                                invalidation_reasons.append("dependency hash changed")
-                                
-                            if not invalidation_reasons:
-                                logger.info(f"[{stage_name}] Cache HIT")
-                                cache_hit = True
-                                
-                                # Convert dict back to correct domain model if needed.
-                                # For now we rely on the reducer or stage to handle the raw dict or we rebuild the artifact.
-                                # We can't automatically infer the class without a registry, so we let the stage instantiate it if we have `load_cached_artifact`
-                                # Or we expect the stage to return it.
-                                if hasattr(stage, "load_cached_artifact"):
-                                    cached_artifact = stage.load_cached_artifact(current_context.workspace)
-                                    from core.pipeline.stage import StageResult
-                                    from core.domain.assets.execution import ExecutionNode
-                                    node = ExecutionNode(artifact=cached_artifact, stage_name=stage_name)
-                                    candidate_result = StageResult(
-                                        artifact=cached_artifact,
-                                        execution_node=node,
-                                        metrics={"cache_hit": True},
-                                        metadata={}
-                                    )
-                                else:
-                                    logger.warning(f"[{stage_name}] Hit cache but stage lacks load_cached_artifact. Rebuilding.")
-                                    cache_hit = False
-                            else:
-                                logger.info(f"[{stage_name}] Cache MISS")
-                                logger.info(f"Reason: \n  • " + "\n  • ".join(invalidation_reasons))
-                                logger.info("Rebuilding...")
+                if hasattr(stage, "inputs") and hasattr(stage, "outputs"):
+                    inputs = stage.inputs(current_context)
+                    outputs = stage.outputs()
+                    
+                    dep_parts = []
+                    for inp in inputs:
+                        if hasattr(inp, "metadata"):
+                            dep_parts.append(getattr(inp.metadata, "fingerprint", str(inp.metadata)))
+                        elif hasattr(inp, "fingerprint"):
+                            dep_parts.append(inp.fingerprint)
+                        else:
+                            dep_parts.append(str(inp))
+                    
+                    current_gen_sig = stage.generator_signature()
+                    
+                    # Assume one output artifact name corresponds to the stage name's core function
+                    # For simplicity in this rewrite, we will just use outputs[0] as the cache key if present
+                    if outputs:
+                        out_name = outputs[0]
+                        if dag.is_fresh(out_name, dep_parts, current_gen_sig):
+                            logger.info(f"[{stage_name}] Cache HIT (rebuilding anyway — load_cached_artifact not yet implemented)")
+                        else:
+                            logger.info(f"[{stage_name}] Cache MISS")
+                            logger.info("Rebuilding...")
 
             while not cache_hit:
                 logger.info(f"Starting stage: {stage_name} (Attempt {retries + 1})")
@@ -131,6 +92,14 @@ class CompilerExecutor:
                     if retries >= self.max_retries:
                         logger.error(f"[FATAL] {stage_name} exhausted all retries.", exc_info=True)
                         raise e
+            
+            # Record the DAG state
+            if hasattr(current_context, "workspace") and candidate_result:
+                if hasattr(stage, "inputs") and hasattr(stage, "outputs"):
+                    outputs = stage.outputs()
+                    if outputs:
+                        out_name = outputs[0]
+                        dag.record(out_name, dep_parts, current_gen_sig)
             
             # Reduce context whether from cache or fresh execution
             if candidate_result:

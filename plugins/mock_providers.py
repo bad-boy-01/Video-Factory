@@ -1,3 +1,4 @@
+import os
 import random
 import time
 import uuid
@@ -141,4 +142,3 @@ class MockVideoRenderer(VideoRendererProvider):
             
         return output_path
 
-import os

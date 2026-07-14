@@ -63,3 +63,12 @@ The final phase stitches all the disparate assets into a seamless movie.
 **Date**: 2026-07-11
 **Issue Fixed**: Stable Diffusion 1.5 Token Limit Truncation (Token indices sequence length > 77) during rendering phase.
 **Resolution/Decision**: `PromptBuilderStage` previously appended long scene state and environment descriptions before critical character and camera details, causing the most important visual anchors to be discarded by the 77-token CLIP limit. Reordered the string assembly in `core/optimization/prompt_builder.py` to prioritize style, characters, and camera constraints before environmental and beat description fields.
+
+**Date**: 2026-07-14
+**Major Architecture Overhaul**: The AnimateDiff pipeline was deemed too unstable and low-quality under constrained (free-tier) limits. The system was transformed into an AI-Directed Film Compiler for Korean manhwa-style videos.
+**Resolutions/Decisions**:
+1. **Rendering Backend Swap**: Replaced AnimateDiff with SDXL Lightning (`ByteDance/SDXL-Lightning`) generating still images.
+2. **Direction Layer**: Introduced `NarrativeAnalyzer`, `StoryboardPlanner`, `CinematographyEngine` and `SceneGraphBuilder`. The LLM now focuses on facts (genre, emotion, entity mapping), while deterministic policy engines handle camera decisions and composition.
+3. **ArtifactStore & Image Bank**: Replaced `AssetRegistry` with a content-addressable `ArtifactStore`. Generated images are stored by `prompt_hash`, allowing instant reuse across shots with identical prompts, drastically saving Kaggle GPU time.
+4. **ImageQA & Critic Loop**: Built `ImageQAEvaluator` (evaluating CLIP score, sharpness, faces, OCR artifacts) and a deterministic `CriticFeedback` loop that revises failing prompts and regenerates.
+5. **Post-Production (FFmpeg)**: Upgraded `FFmpegVideoRenderer` to perform Ken Burns motion (zoompan) on the SDXL stills, crossfade transitions (xfade), and SRT subtitle burn-in.

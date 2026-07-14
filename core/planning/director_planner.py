@@ -73,8 +73,8 @@ class DirectorPlannerStage(CompilerStage):
             raise ValueError("DirectorPlanner requires both SceneManifest and ShotManifest.")
             
         enriched_manifest = copy.deepcopy(shot_manifest)
-        enriched_manifest.generator = "DirectorPlannerStage"
-        enriched_manifest.generator_version = "1.0.0"
+        # NOTE: Provenance is tracked via ExecutionNode.stage_name, not via
+        # fields on the domain model (ShotManifest has no generator field).
 
         schema = {
             "project_style_name": "string (e.g. villeneuve, webtoon)"

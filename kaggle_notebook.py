@@ -30,7 +30,7 @@ import subprocess, sys, os
 #
 # How to attach models (Kaggle sidebar → Data → + Add Data → Models tab):
 #   • "Qwen/Qwen1.5-4B-Chat"                    → attaches to /kaggle/input/qwen1-5-4b-chat/
-#   • "stabilityai/stable-diffusion-xl-base-1.0" → attaches to /kaggle/input/stable-diffusion-xl-base-1-0/
+#   • "ByteDance/SDXL-Lightning"                → attaches to /kaggle/input/sdxl-lightning/
 import os
 os.makedirs("/kaggle/working/hf_cache", exist_ok=True)
 os.environ["HF_HOME"]               = "/kaggle/working/hf_cache"
@@ -39,7 +39,7 @@ os.environ["HUGGINGFACE_HUB_CACHE"] = "/kaggle/working/hf_cache"
 os.environ["DIFFUSERS_CACHE"]       = "/kaggle/working/hf_cache"
 # Tell local_llm.py where the Kaggle model datasets are mounted:
 os.environ["KAGGLE_LLM_INPUT"]      = "/kaggle/input/qwen1-5-4b-chat"
-os.environ["KAGGLE_SDXL_INPUT"]     = "/kaggle/input/stable-diffusion-xl-base-1-0"
+os.environ["KAGGLE_SDXL_INPUT"]     = "/kaggle/input/sdxl-lightning"
 
 # ── 1b. Verify GPU ────────────────────────────────────────────────────────────
 import torch
@@ -83,9 +83,9 @@ import os, sys
 #      Kaggle slug: qwen1-5-4b-chat
 #      Will appear at: /kaggle/input/qwen1-5-4b-chat/
 #
-#   2. stabilityai/stable-diffusion-xl-base-1.0
-#      Kaggle slug: stable-diffusion-xl-base-1-0
-#      Will appear at: /kaggle/input/stable-diffusion-xl-base-1-0/
+#   2. ByteDance/SDXL-Lightning
+#      Kaggle slug: sdxl-lightning
+#      Will appear at: /kaggle/input/sdxl-lightning/
 #
 # After attaching, the os.environ lines in Cell 1 point HuggingFace directly
 # there — no download occurs, no RAM is consumed during load.
@@ -175,22 +175,23 @@ with open(NOVEL_PATH, "w", encoding="utf-8") as f:
     f.write(NOVEL_TEXT.strip())
 print(f"Novel written: {NOVEL_PATH}  ({len(NOVEL_TEXT)} chars)")
 
-# ── 4b. Run planning (StoryBible → SceneSplitter → ShotPlanner →
-#                     CameraPlanner → PromptBuilder → Validator → Timeline) ───
+# ── 4b. Run planning (StoryBible → NarrativeAnalyzer → SceneSplitter → 
+#                     SceneGraphBuilder → VisualStyleBible → StoryboardPlanner → 
+#                     ShotPlanner → CastPlanner → CinematographyEngine → PromptBuilder) ───
 # First run: Qwen 1.5-4B-Chat (~2-3 GB) will be downloaded and cached.
 # Subsequent runs: instant load from /root/.cache/huggingface
 
 result = subprocess.run(
     [sys.executable, "main.py",
      "--novel", NOVEL_PATH,
-     "--mode",  "plan"],
+     "--stage", "plan"],
     text=True
 )
 
 if result.returncode != 0:
     raise RuntimeError("Planning pipeline failed — see output above.")
-print("\\n✅ Planning pipeline complete.")
-print("Artifacts:", [f for f in os.listdir("workspace") if f.endswith(".json")])
+print("\n✅ Planning pipeline complete.")
+print("Artifacts:", [f for f in os.listdir("workspace/manifests") if f.endswith(".json")])
 """
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -199,8 +200,8 @@ print("Artifacts:", [f for f in os.listdir("workspace") if f.endswith(".json")])
 """
 import os, subprocess, sys
 
-assert os.path.exists("workspace/PromptManifest.json"), (
-    "PromptManifest.json not found — run Cell 4 first."
+assert os.path.exists("workspace/manifests/prompt_manifest.json"), (
+    "prompt_manifest.json not found — run Cell 4 (planning) first."
 )
 
 # ── Rendering scope (comment out flags you don't need) ────────────────────────
@@ -218,8 +219,7 @@ RENDER_FLAGS = []
 
 result = subprocess.run(
     [sys.executable, "main.py",
-     "--novel", "sample.txt",
-     "--mode",  "render",
+     "--stage", "render",
      *RENDER_FLAGS],
     text=True
 )
